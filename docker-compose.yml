@@ -1,0 +1,12 @@
+services:
+  nodejs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tripsurance-be-img
+    container_name: tripsurance-be-app
+    restart: on-failure:3
+    env_file:
+      - .env.prod
+    ports:
+      - '3000:3000'
