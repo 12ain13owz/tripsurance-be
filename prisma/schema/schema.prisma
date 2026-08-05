@@ -1,0 +1,12 @@
+// Prisma multi-file schema. Each domain lives in its own *.prisma file in this
+// folder; Prisma merges them automatically. Keep exactly one generator and one
+// datasource block (here). Connection URLs are injected via prisma.config.ts.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

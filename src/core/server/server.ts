@@ -1,4 +1,5 @@
 import { env } from '@/core/config'
+import { disconnectDatabase } from '@/core/database/prisma'
 import { logger } from '@/core/logger'
 import { APP_GENERIC } from '@/shared/constants'
 import type { Express } from 'express'
@@ -30,10 +31,6 @@ export const shutdown = (exitCode = 0): void => {
   }
   isShuttingDown = true
 
-  if (!serverInstance) {
-    process.exit(exitCode)
-  }
-
   // Hard ceiling so a stuck connection can't block process exit past the orchestrator's grace period.
   const forceExit = setTimeout(() => {
     logger.error('Forced shutdown: server did not close in time', { source: false })
@@ -41,7 +38,21 @@ export const shutdown = (exitCode = 0): void => {
   }, env.SHUTDOWN_TIMEOUT_MS)
   forceExit.unref()
 
-  serverInstance.close(() => {
+  const closeServer = async (): Promise<void> =>
+    new Promise((resolve) => {
+      if (!serverInstance) {
+        resolve()
+        return
+      }
+      serverInstance.close(() => resolve())
+    })
+
+  void Promise.allSettled([closeServer(), disconnectDatabase()]).then((results) => {
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        logger.error(result.reason)
+      }
+    }
     clearTimeout(forceExit)
     process.exit(exitCode)
   })
