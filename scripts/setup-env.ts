@@ -42,11 +42,7 @@ function setupEnv(): void {
     createEnvFile(envExamplePath, envDevPath, { NODE_ENV: 'development' })
     createEnvFile(envExamplePath, envProdPath, { NODE_ENV: 'production' })
 
-    console.log(
-      chalk.cyan(
-        '\nPlease edit .env.development and .env.production with your configuration values.'
-      )
-    )
+    console.log(chalk.cyan('\nPlease edit .env.dev and .env.prod with your configuration values.'))
     console.log(chalk.cyan('You can use any text editor (e.g., nano, vim, or VS Code).'))
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
