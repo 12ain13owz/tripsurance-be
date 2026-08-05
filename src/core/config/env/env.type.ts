@@ -10,4 +10,5 @@ export type EnvConfig = {
   LOG_LEVEL_FILE: LogLevel
   LOG_LEVEL_ERROR_FILE: LogLevel
   SHUTDOWN_TIMEOUT_MS: number
+  DATABASE_URL: string
 }

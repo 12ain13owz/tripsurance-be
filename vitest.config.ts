@@ -18,6 +18,7 @@ export default defineConfig({
       LOG_LEVEL_FILE: 'error',
       LOG_LEVEL_ERROR_FILE: 'error',
       SHUTDOWN_TIMEOUT_MS: '10000',
+      DATABASE_URL: 'postgresql://user_postgres:pass_postgres@localhost:5432/tripsurance',
     },
   },
 })

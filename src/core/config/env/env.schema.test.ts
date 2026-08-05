@@ -9,6 +9,8 @@ const validEnv = {
   LOG_LEVEL_CONSOLE: 'info',
   LOG_LEVEL_FILE: 'info',
   LOG_LEVEL_ERROR_FILE: 'error',
+  SHUTDOWN_TIMEOUT_MS: '10000',
+  DATABASE_URL: 'postgresql://user_postgres:pass_postgres@localhost:5432/tripsurance',
 }
 
 describe('envSchema', () => {
@@ -65,5 +67,13 @@ describe('envSchema', () => {
     if (result.success) {
       expect(result.data.SHUTDOWN_TIMEOUT_MS).toBe(5000)
     }
+  })
+
+  it('rejects an unrecognized database url', () => {
+    const result = envSchema.safeParse({
+      ...validEnv,
+      DATABASE_URL: 'not-a-valid-database-url',
+    })
+    expect(result.success).toBe(false)
   })
 })
