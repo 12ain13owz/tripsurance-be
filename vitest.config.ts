@@ -19,6 +19,10 @@ export default defineConfig({
       LOG_LEVEL_ERROR_FILE: 'error',
       SHUTDOWN_TIMEOUT_MS: '10000',
       DATABASE_URL: 'postgresql://user_postgres:pass_postgres@localhost:5432/tripsurance',
+      JWT_ACCESS_SECRET: 'access-token-at-least-32-characters',
+      JWT_ACCESS_EXPIRES: '1d',
+      JWT_REFRESH_SECRET: 'refresh-token-at-least-32-characters',
+      JWT_REFRESH_EXPIRES: '7d',
     },
   },
 })

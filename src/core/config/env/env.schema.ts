@@ -5,6 +5,7 @@ import { AppEnv } from '@/shared/types'
 import type { EnvConfig } from './env.type'
 
 const logLevel = Object.keys(LOG_LEVELS) as LogLevel[]
+const durationString = /^\d+(s|m|h|d|w|y)$/
 
 export const envSchema: z.ZodType<EnvConfig> = z.object({
   PORT: z.coerce.number().int().positive().max(65535),
@@ -24,4 +25,8 @@ export const envSchema: z.ZodType<EnvConfig> = z.object({
   LOG_LEVEL_ERROR_FILE: z.enum(logLevel),
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   DATABASE_URL: z.url(),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRES: z.string().regex(durationString),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_REFRESH_EXPIRES: z.string().regex(durationString),
 })
