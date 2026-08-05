@@ -15,6 +15,7 @@ const scalarConfig: Partial<ApiReferenceConfiguration> = {
   hideClientButton: true,
   hideTestRequestButton: true,
   mcp: { disabled: true },
+  telemetry: false,
 }
 
 router.get('/openapi.json', async (_req, res, next) => {

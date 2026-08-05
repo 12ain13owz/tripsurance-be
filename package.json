@@ -9,7 +9,8 @@
     "dev": "tsx --watch --env-file-if-exists=.env.dev src/main.ts",
     "fix": "eslint . --fix && prettier --write .",
     "clean": "rimraf dist",
-    "build": "npm run clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths",
+    "build": "npm run clean && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json --resolve-full-paths && npm run copy-assets",
+    "copy-assets": "node -e \"require('node:fs').cpSync('src/features/docs/spec','dist/features/docs/spec',{recursive:true})\"",
     "setup-env": "tsx scripts/setup-env.ts",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -20,6 +21,7 @@
     "fix": "Automatically fixes linting issues and formats code with Prettier.",
     "clean": "Removes the dist directory for a fresh build.",
     "build": "Compiles TypeScript to JavaScript and resolves path aliases.",
+    "copy-assets": "Copies the OpenAPI YAML spec tree into dist/ (not handled by tsc).",
     "setup-env": "Initializes .env.dev and .env.prod files from templates.",
     "test": "Runs the test suite once (Vitest).",
     "test:watch": "Runs the test suite in watch mode (Vitest)."
