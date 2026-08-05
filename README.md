@@ -155,7 +155,7 @@ The image compiles TypeScript at build time and runs the compiled output (`npm s
 |  |  \- server/              # Server bootstrap + graceful shutdown
 |  |- features/               # Feature modules (one folder per feature)
 |  |  |- docs/                # OpenAPI spec + Scalar API reference UI
-|  |  \- health/               # Health check (success + simulated error)
+|  |  \- health/              # Health check (success + simulated error)
 |  |- shared/                 # Cross-cutting building blocks
 |  |  |- constants/           # HttpStatus, messages (SUCCESS/ERRORS/LOG), app constants
 |  |  |- types/               # Shared types + Express augmentation
