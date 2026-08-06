@@ -131,7 +131,8 @@ Import `env` from `@/core/config`, never from `./env/env`. Add env-dependent mid
 - Response messages come from `SUCCESS`/`ERRORS` in `@/shared/constants`, or from a feature-local `<feature>.const.ts` for messages specific to that feature's domain (see §3) — never hardcoded inline strings. These are plain strings — no i18n key/message object (see §1).
 - Console-only strings (startup/config logs, never sent to a client) come from the separate `LOG` constant in the same file. Don't mix the two: if it's only ever passed to `console.*`, it belongs in `LOG`, not `SUCCESS`/`ERRORS`.
 - HTTP codes come from the `HttpStatus` enum, never magic numbers.
-- To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` in `main.ts` formats it (full details in development, message-only in production).
+- To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` (`core/error/error.middleware.ts`, wired in `app.ts`) formats it (full details in development, message-only in production).
+- Malformed JSON request bodies never reach a controller — `express.json()` throws before routing, and the error isn't an `AppError`. `errorHandler` detects this case (`SyntaxError` with `.type === 'entity.parse.failed'`) and normalizes it to a `400` `AppError` (`ERRORS.GENERIC.INVALID_JSON_BODY`) instead of leaking the raw parser message and defaulting to `500`. Follow the same normalize-before-formatting approach for any other non-`AppError` exception that has a well-known client-facing meaning.
 
 `AppError` builder methods:
 
@@ -156,7 +157,10 @@ catch excess properties on its own; if a field must never leave the service (a t
 strip it explicitly via destructuring before this assignment, not just via the type. Name the
 type `<Feature><Action>Data` (e.g. `LoginData`) — it describes the `data` field's shape, not the
 full response envelope — and keep the local variable named `data` so it matches
-`createResponse`'s own parameter name:
+`createResponse`'s own parameter name. Likewise, assign `createResponse`'s result to its own
+`response` constant before calling `res.json` — don't nest the call inside `.json(...)`. Keeping
+each step (`data` -> `response` -> `res.status(...).json(response)`) on its own line reads as a
+sequence of named steps instead of one dense expression:
 
 ```ts
 import { HttpStatus, SUCCESS } from '@/shared/constants'
@@ -172,7 +176,8 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
   try {
     const credentials = loginSchema.parse(req.body)
     const data: LoginData = await authService.login(credentials)
-    res.status(HttpStatus.OK).json(createResponse(SUCCESS.AUTH.LOGIN, data))
+    const response = createResponse(SUCCESS.AUTH.LOGIN, data)
+    res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
   }
