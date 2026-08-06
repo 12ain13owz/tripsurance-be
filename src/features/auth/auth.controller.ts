@@ -20,7 +20,8 @@ export const signIn = async (
     setRefreshCookie(res, refreshToken, exp)
 
     const data: SignInData = session
-    res.status(HttpStatus.OK).json(createResponse(AUTH_MESSAGES.SIGN_IN, data))
+    const response = createResponse(AUTH_MESSAGES.SIGN_IN, data)
+    res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
   }

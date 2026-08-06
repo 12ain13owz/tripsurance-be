@@ -1,6 +1,5 @@
-import { z } from 'zod'
 import { AppError } from '@/core/error'
-import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
+import { ErrorSeverity, HttpStatus } from '@/shared/constants'
 import type { NextFunction, Request, RequestHandler, Response } from 'express'
 import type { ZodType } from 'zod'
 
@@ -42,16 +41,12 @@ export const validate =
     const result = schema.safeParse(readSource(req, source))
 
     if (!result.success) {
-      const { fieldErrors, formErrors } = z.flattenError(result.error)
+      const message = result.error.issues.map((issue) => issue.message).join(', ')
       next(
-        new AppError(
-          ERRORS.GENERIC.VALIDATION_ERROR,
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          ErrorSeverity.WARN
-        )
+        new AppError(message, HttpStatus.UNPROCESSABLE_ENTITY, ErrorSeverity.WARN)
           .withOperation('validate')
           .withEndpoint(req)
-          .withMetadata({ source, fieldErrors, formErrors })
+          .withMetadata({ source })
       )
       return
     }
