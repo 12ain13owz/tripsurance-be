@@ -11,6 +11,7 @@ export const envSchema: z.ZodType<EnvConfig> = z.object({
   PORT: z.coerce.number().int().positive().max(65535),
   NODE_ENV: z.enum([AppEnv.DEVELOPMENT, AppEnv.PRODUCTION]),
   BASE_URL: z.string(),
+  COOKIE_DOMAIN: z.string().min(1).optional(),
   CORS_ORIGINS: z
     .string()
     .optional()

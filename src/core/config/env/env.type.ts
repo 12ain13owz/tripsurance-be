@@ -5,6 +5,7 @@ export type EnvConfig = {
   PORT: number
   NODE_ENV: AppEnv
   BASE_URL: string
+  COOKIE_DOMAIN?: string
   CORS_ORIGINS: string[]
   LOG_LEVEL_CONSOLE: LogLevel
   LOG_LEVEL_FILE: LogLevel
