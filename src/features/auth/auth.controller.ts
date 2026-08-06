@@ -4,7 +4,7 @@ import { createResponse } from '@/shared/utils'
 import { AUTH_MESSAGES } from './auth.const'
 import { setRefreshCookie } from './auth.cookie'
 import * as authService from './auth.service'
-import type { AuthReq, SignInRes } from './auth.type'
+import type { AuthReq, SignInData } from './auth.type'
 import type { Response, NextFunction } from 'express'
 
 export const signIn = async (
@@ -14,13 +14,13 @@ export const signIn = async (
 ): Promise<void> => {
   try {
     const { email, password } = req.body
-    const result = await authService.login(email, password)
-    const refreshToken = verifyRefreshToken(result.refreshToken)
+    const { refreshToken, ...session } = await authService.login(email, password)
+    const { exp } = verifyRefreshToken(refreshToken)
 
-    setRefreshCookie(res, result.refreshToken, refreshToken.exp)
+    setRefreshCookie(res, refreshToken, exp)
 
-    const response: SignInRes = createResponse(AUTH_MESSAGES.LOGIN, result)
-    res.status(HttpStatus.OK).json(response)
+    const data: SignInData = session
+    res.status(HttpStatus.OK).json(createResponse(AUTH_MESSAGES.SIGN_IN, data))
   } catch (error) {
     next(error)
   }

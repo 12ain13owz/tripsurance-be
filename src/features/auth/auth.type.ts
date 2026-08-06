@@ -1,5 +1,5 @@
 import type { User } from '@/generated/prisma/client'
-import type { AppResponse, ReqOf } from '@/shared/types'
+import type { ReqOf } from '@/shared/types'
 import type { authSchema } from './auth.schema'
 
 export type SafeUser = Omit<User, 'password'>
@@ -12,4 +12,4 @@ export interface AuthSession {
   refreshToken: string
 }
 
-export type SignInRes = AppResponse<Omit<AuthSession, 'refreshToken'>>
+export type SignInData = Omit<AuthSession, 'refreshToken'>

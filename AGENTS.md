@@ -148,6 +148,16 @@ Controllers are thin: validate input, call a service, return via `createResponse
 
 Reference implementation in this repo: `src/features/health/` (routes + controller only — a real CRUD feature would add `.service.ts` and `.schema.ts` too, as below).
 
+Before calling `createResponse`, assign the payload to a locally-typed `data` constant instead of
+passing the service's return value straight through. This makes the response shape visible to
+whoever opens the controller — no need to jump into the service or type file to know what's
+being sent — and, since the type is a plain assignment (not an object literal), it still won't
+catch excess properties on its own; if a field must never leave the service (a token, a hash),
+strip it explicitly via destructuring before this assignment, not just via the type. Name the
+type `<Feature><Action>Data` (e.g. `LoginData`) — it describes the `data` field's shape, not the
+full response envelope — and keep the local variable named `data` so it matches
+`createResponse`'s own parameter name:
+
 ```ts
 import { HttpStatus, SUCCESS } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
@@ -155,13 +165,14 @@ import { createResponse } from '@/shared/utils'
 import * as authService from './auth.service'
 import { loginSchema } from './auth.schema'
 
+import type { LoginData } from './auth.type'
 import type { NextFunction, Request, Response } from 'express'
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const credentials = loginSchema.parse(req.body)
-    const result = await authService.login(credentials)
-    res.status(HttpStatus.OK).json(createResponse(SUCCESS.AUTH.LOGIN, result))
+    const data: LoginData = await authService.login(credentials)
+    res.status(HttpStatus.OK).json(createResponse(SUCCESS.AUTH.LOGIN, data))
   } catch (error) {
     next(error)
   }
