@@ -105,6 +105,8 @@ features  ->  shared
 
 Skip files you genuinely don't need — e.g. `src/features/health/` only has `health.routes.ts` + `health.controller.ts` (no service, no schema) because there's nothing to validate or delegate. Keep the naming when you do add a file.
 
+**Messages:** generic, reusable text (CRUD success/fail wording, HTTP-generic errors) belongs in `SUCCESS`/`ERRORS` in `shared/constants/message.const.ts` — extend it, don't duplicate. A feature may keep its own `<feature>.const.ts` (e.g. `auth.const.ts`) only for messages specific to that feature's domain (e.g. "Invalid email or password") that wouldn't make sense reused elsewhere. Default to the shared file when in doubt.
+
 ### Config (`src/core/config/`)
 
 | File                | Responsibility                                                             |
@@ -126,7 +128,7 @@ Import `env` from `@/core/config`, never from `./env/env`. Add env-dependent mid
 { message: string, timestamp: string, data?: T }
 ```
 
-- Response messages come from `SUCCESS` / `ERRORS` in `@/shared/constants` (extend them, don't hardcode strings). These are plain strings — no i18n key/message object (see §1).
+- Response messages come from `SUCCESS`/`ERRORS` in `@/shared/constants`, or from a feature-local `<feature>.const.ts` for messages specific to that feature's domain (see §3) — never hardcoded inline strings. These are plain strings — no i18n key/message object (see §1).
 - Console-only strings (startup/config logs, never sent to a client) come from the separate `LOG` constant in the same file. Don't mix the two: if it's only ever passed to `console.*`, it belongs in `LOG`, not `SUCCESS`/`ERRORS`.
 - HTTP codes come from the `HttpStatus` enum, never magic numbers.
 - To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` in `main.ts` formats it (full details in development, message-only in production).
@@ -248,7 +250,7 @@ import { authRouter } from '@/features/auth'
 router.use('/auth', authRouter)
 ```
 
-9. **Document the endpoint** (OpenAPI): the spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
+9. **Document the endpoint** (OpenAPI) — write this once manual testing (§8) confirms the endpoint's behavior, not while first implementing it; land it together with the tests in the same follow-up change. The spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
 
 10. **Verify** (section 7).
 
@@ -260,7 +262,15 @@ There's no `core/middleware/` folder yet — the only middleware wired up today 
 - Feature-specific middleware can live in the feature folder instead.
 - Wire global middleware in `main.ts`.
 
-## 8. Definition of done — always run before finishing
+## 8. Definition of done
+
+A feature moves through these stages, in order:
+
+1. **Implement** the feature per the shapes in §5–6.
+2. **Manual test** the endpoint (e.g. via Postman) — happy path + main error paths.
+3. Once manual testing confirms the behavior is correct, **write tests** (§1) and the
+   **OpenAPI doc** (§6 step 9) together, in the same follow-up change.
+4. Run:
 
 ```bash
 npm run fix     # ESLint --fix + Prettier
@@ -268,7 +278,9 @@ npm run build   # type-check + compile (must pass with no errors)
 npm test        # run whenever test files exist for the touched code (see §1 Testing)
 ```
 
-A change is complete only when these succeed and the new feature router is mounted in `src/routes.ts`.
+It's fine to land stage 1 as its own commit before stages 2–3 are finished — just don't
+call the feature "done" (or open it for review/PR) until docs + tests land. A feature is
+only complete once all four stages pass and the router is mounted in `src/routes.ts`.
 
 ## 9. Quick do / don't
 
