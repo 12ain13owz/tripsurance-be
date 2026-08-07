@@ -8,7 +8,15 @@ If anything here conflicts with the actual code, the code wins — update this f
 
 ## 1. What this project is
 
-A feature-based REST API **starter**: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It ships as a clean base for new projects to build on top of.
+**tripsurance-be** is the backend for a trip/travel insurance sales platform. This service covers the **admin side only** — internal staff (admin, super admin) who manage the platform. It does **not** serve end-customer/policyholder flows (no public quote/purchase API here — that's a separate concern/service if/when it exists).
+
+Consequences of "admin-only, invite-based" that shape how features get built:
+
+- **No self-registration.** `User` accounts are created via invite (`invitedById`/`invitationTokenHash` on the `User` model, `prisma/schema/user.prisma`) — there is no public sign-up endpoint and none should be added. Auth today only exposes sign-in (`POST /auth/sign-in`).
+- **Two roles only** — `ADMIN`, `SUPER_ADMIN` (`Role` enum, `prisma/schema/user.prisma`). No customer/policyholder role exists in this codebase.
+- When adding a feature, ask "is this something an admin does to manage the platform?" — if it's customer-facing (getting a quote, buying a policy, filing a claim as the end user), confirm with the person assigning the work before building it here.
+
+Technically, it's a feature-based REST API: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It started from a generic starter template and has since diverged into this domain-specific backend — most of what follows in this doc is the starter's conventions, still enforced.
 
 Already wired up in this project (diverged from the bare `node-express-ts-starter` base — check that repo if you need the generic, auth-free version):
 
