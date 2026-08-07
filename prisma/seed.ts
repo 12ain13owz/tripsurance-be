@@ -13,7 +13,7 @@ export async function runSeed(): Promise<void> {
 
   try {
     await seedUsers(prisma)
-  } catch (error) {
+  } finally {
     await prisma.$disconnect()
   }
 }

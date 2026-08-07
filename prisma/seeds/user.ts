@@ -7,6 +7,7 @@ interface SeedUser {
   firstName: string
   lastName: string
   role: Role
+  isActive: boolean
 }
 
 const SALT_ROUNDS = 10
@@ -17,12 +18,21 @@ const SEED_USERS: SeedUser[] = [
     firstName: 'Tripsurance',
     lastName: 'Admin',
     role: Role.ADMIN,
+    isActive: true,
+  },
+  {
+    email: 'tripsurance.inactive@mailinator.com',
+    firstName: 'Tripsurance',
+    lastName: 'Admin',
+    role: Role.ADMIN,
+    isActive: false,
   },
   {
     email: 'tripsurance.superadmin@mailinator.com',
     firstName: 'Tripsurance',
     lastName: 'Super Admin',
     role: Role.SUPER_ADMIN,
+    isActive: true,
   },
 ]
 
@@ -42,7 +52,7 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
         lastName: user.lastName,
         password: passwordHash,
         role: user.role,
-        isActive: true,
+        isActive: user.isActive,
         isEmailVerified: true,
       },
     })

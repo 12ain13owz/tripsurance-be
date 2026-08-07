@@ -23,7 +23,7 @@ npm run db:seed            # insert the seed accounts (login test users, see pri
 npm run dev
 ```
 
-Use `db:deploy` here, not `db:migrate` — `migrate dev` is for when *you* are changing the
+Use `db:deploy` here, not `db:migrate` — `migrate dev` is for when _you_ are changing the
 schema (it diffs and asks for a migration name); a fresh machine just needs to replay
 migrations that already exist, which is exactly what `deploy` does non-interactively.
 
@@ -76,25 +76,25 @@ npm run dev
 
 ## 2. Command cheat sheet
 
-| Command | What it does | When to use |
-| --- | --- | --- |
-| `npm run db:generate` | Regenerates Prisma Client types only. **No DB change.** | After `git pull` when a teammate added new migrations — syncs your local TS types. |
-| `npm run db:migrate` | Diffs schema, creates + applies a new migration, regenerates client. | The main command while actively developing — every schema edit. |
-| `npm run db:push` | Force-syncs schema straight to the DB, **no migration file created.** | Quick throwaway prototyping only. Never for real feature work — leaves no history, can't be deployed the same way to other environments. |
-| `npm run db:deploy` | Applies existing, already-created migrations, no prompts, creates nothing new. | CI/CD and production deploys. Never run this expecting it to pick up new schema edits — it only replays what's already in `prisma/migrations/`. |
-| `npm run db:studio` | Opens a local GUI to browse/edit table rows. | Inspecting seeded data, debugging, manual data fixes in dev. |
-| `npm run db:reset` | **Drops the whole local DB**, replays every migration from scratch, then re-runs the seed. | "Start clean" button — local dev only. Never in production (see §4). |
-| `npm run db:seed` | Runs `prisma/seed.ts` standalone to insert baseline data. | After `db:push`/manual DB changes, or anytime you want the seed accounts back without a full reset. |
+| Command               | What it does                                                                               | When to use                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run db:generate` | Regenerates Prisma Client types only. **No DB change.**                                    | After `git pull` when a teammate added new migrations — syncs your local TS types.                                                              |
+| `npm run db:migrate`  | Diffs schema, creates + applies a new migration, regenerates client.                       | The main command while actively developing — every schema edit.                                                                                 |
+| `npm run db:push`     | Force-syncs schema straight to the DB, **no migration file created.**                      | Quick throwaway prototyping only. Never for real feature work — leaves no history, can't be deployed the same way to other environments.        |
+| `npm run db:deploy`   | Applies existing, already-created migrations, no prompts, creates nothing new.             | CI/CD and production deploys. Never run this expecting it to pick up new schema edits — it only replays what's already in `prisma/migrations/`. |
+| `npm run db:studio`   | Opens a local GUI to browse/edit table rows.                                               | Inspecting seeded data, debugging, manual data fixes in dev.                                                                                    |
+| `npm run db:reset`    | **Drops the whole local DB**, replays every migration from scratch, then re-runs the seed. | "Start clean" button — local dev only. Never in production (see §4).                                                                            |
+| `npm run db:seed`     | Runs `prisma/seed.ts` standalone to insert baseline data.                                  | After `db:push`/manual DB changes, or anytime you want the seed accounts back without a full reset.                                             |
 
-| คำสั่ง | ทำอะไร | ใช้ตอนไหน |
-| --- | --- | --- |
-| `npm run db:generate` | generate type ของ Prisma Client ใหม่เท่านั้น **ไม่แตะ DB** | หลัง `git pull` แล้วเพื่อนเพิ่ม migration ใหม่มา — sync type ให้ตรง |
-| `npm run db:migrate` | เทียบ schema, สร้าง+apply migration ใหม่, generate client ให้ | คำสั่งหลักตอน dev — ใช้ทุกครั้งที่แก้ schema |
-| `npm run db:push` | บังคับ sync schema ลง DB ตรงๆ **ไม่สร้างไฟล์ migration** | prototype เร็วๆ ทิ้งได้เท่านั้น ห้ามใช้กับงานจริง เพราะไม่มีประวัติ ย้ายไป environment อื่นแบบเดียวกันไม่ได้ |
-| `npm run db:deploy` | apply migration ที่มีอยู่แล้ว ไม่ถาม ไม่สร้างใหม่ | ใช้ตอน deploy CI/CD หรือ production เท่านั้น อย่าหวังว่ามันจะจับ schema ที่เพิ่งแก้ — มันแค่ replay ไฟล์ที่มีอยู่ใน `prisma/migrations/` |
-| `npm run db:studio` | เปิด GUI local ดู/แก้ข้อมูลในตาราง | ตรวจข้อมูลที่ seed ไว้, debug, แก้ข้อมูลมือระหว่าง dev |
-| `npm run db:reset` | **ลบ DB local ทั้งหมด** แล้ว replay migration ทุกไฟล์ใหม่ตั้งแต่ต้น แล้ว seed ให้อัตโนมัติ | ปุ่ม "เริ่มใหม่ให้สะอาด" ใช้ local dev เท่านั้น ห้ามรันใน production (ดู §4) |
-| `npm run db:seed` | รัน `prisma/seed.ts` เพื่อใส่ข้อมูลพื้นฐานเข้า DB | หลัง `db:push`/แก้ DB มือ หรืออยากได้ seed account กลับมาโดยไม่ต้อง reset ทั้งหมด |
+| คำสั่ง                | ทำอะไร                                                                                     | ใช้ตอนไหน                                                                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run db:generate` | generate type ของ Prisma Client ใหม่เท่านั้น **ไม่แตะ DB**                                 | หลัง `git pull` แล้วเพื่อนเพิ่ม migration ใหม่มา — sync type ให้ตรง                                                                      |
+| `npm run db:migrate`  | เทียบ schema, สร้าง+apply migration ใหม่, generate client ให้                              | คำสั่งหลักตอน dev — ใช้ทุกครั้งที่แก้ schema                                                                                             |
+| `npm run db:push`     | บังคับ sync schema ลง DB ตรงๆ **ไม่สร้างไฟล์ migration**                                   | prototype เร็วๆ ทิ้งได้เท่านั้น ห้ามใช้กับงานจริง เพราะไม่มีประวัติ ย้ายไป environment อื่นแบบเดียวกันไม่ได้                             |
+| `npm run db:deploy`   | apply migration ที่มีอยู่แล้ว ไม่ถาม ไม่สร้างใหม่                                          | ใช้ตอน deploy CI/CD หรือ production เท่านั้น อย่าหวังว่ามันจะจับ schema ที่เพิ่งแก้ — มันแค่ replay ไฟล์ที่มีอยู่ใน `prisma/migrations/` |
+| `npm run db:studio`   | เปิด GUI local ดู/แก้ข้อมูลในตาราง                                                         | ตรวจข้อมูลที่ seed ไว้, debug, แก้ข้อมูลมือระหว่าง dev                                                                                   |
+| `npm run db:reset`    | **ลบ DB local ทั้งหมด** แล้ว replay migration ทุกไฟล์ใหม่ตั้งแต่ต้น แล้ว seed ให้อัตโนมัติ | ปุ่ม "เริ่มใหม่ให้สะอาด" ใช้ local dev เท่านั้น ห้ามรันใน production (ดู §4)                                                             |
+| `npm run db:seed`     | รัน `prisma/seed.ts` เพื่อใส่ข้อมูลพื้นฐานเข้า DB                                          | หลัง `db:push`/แก้ DB มือ หรืออยากได้ seed account กลับมาโดยไม่ต้อง reset ทั้งหมด                                                        |
 
 ---
 
@@ -103,22 +103,26 @@ npm run dev
 ### Removing a field
 
 **EN:**
+
 - **Column has no data (empty table, or all rows are `NULL`/never used)** — safe. `db:migrate` drops the column, nothing is lost, migration applies cleanly.
-- **Column has real data in it** — the data in that column **is permanently deleted** the moment the migration applies. `migrate dev` will show a warning like *"You are about to drop the column `x`, which still contains data"* and ask you to confirm — but confirming does delete it, there's no undo. Back up (`db:studio` export, or a manual `SELECT`/pg_dump) before removing a field that holds real data.
+- **Column has real data in it** — the data in that column **is permanently deleted** the moment the migration applies. `migrate dev` will show a warning like _"You are about to drop the column `x`, which still contains data"_ and ask you to confirm — but confirming does delete it, there's no undo. Back up (`db:studio` export, or a manual `SELECT`/pg_dump) before removing a field that holds real data.
 
 **ไทย:**
+
 - **Column ไม่มีข้อมูล (ตารางว่าง หรือทุกแถวเป็น `NULL`/ไม่เคยใช้)** — ปลอดภัย `db:migrate` จะลบ column ไปเฉยๆ ไม่มีอะไรหาย migration ผ่านได้ปกติ
-- **Column มีข้อมูลจริงอยู่** — ข้อมูลใน column นั้น**หายถาวรทันทีที่ migration apply** `migrate dev` จะเตือนก่อนว่า *"กำลังจะลบ column x ที่ยังมีข้อมูลอยู่"* และให้ confirm — แต่กด confirm แล้วคือหายจริง กู้คืนไม่ได้ ถ้า column นั้นมีข้อมูลจริงที่สำคัญ ให้ backup ก่อน (export จาก `db:studio` หรือ `SELECT`/`pg_dump` มือ) ก่อนลบ
+- **Column มีข้อมูลจริงอยู่** — ข้อมูลใน column นั้น**หายถาวรทันทีที่ migration apply** `migrate dev` จะเตือนก่อนว่า _"กำลังจะลบ column x ที่ยังมีข้อมูลอยู่"_ และให้ confirm — แต่กด confirm แล้วคือหายจริง กู้คืนไม่ได้ ถ้า column นั้นมีข้อมูลจริงที่สำคัญ ให้ backup ก่อน (export จาก `db:studio` หรือ `SELECT`/`pg_dump` มือ) ก่อนลบ
 
 ### Changing a field from optional to required (`String?` → `String`)
 
 **EN:**
+
 - **Every existing row already has a non-null value in that column** — no impact, migration applies fine, the `NOT NULL` constraint is just formalizing what's already true.
 - **Some existing rows have `NULL` in that column** — the migration **fails to apply**. Postgres refuses to add a `NOT NULL` constraint while rows violate it. You have two options:
   1. Add a `@default(...)` in the schema so Prisma backfills existing `NULL`s with that default as part of the migration.
-  2. Manually edit the generated migration SQL to `UPDATE` and backfill real values for existing `NULL` rows *before* the `ALTER COLUMN ... SET NOT NULL` line.
+  2. Manually edit the generated migration SQL to `UPDATE` and backfill real values for existing `NULL` rows _before_ the `ALTER COLUMN ... SET NOT NULL` line.
 
 **ไทย:**
+
 - **ทุกแถวที่มีอยู่แล้วมีค่าไม่เป็น null ใน column นั้นอยู่แล้ว** — ไม่กระทบอะไร migration ผ่านปกติ แค่ทำให้ constraint ตรงกับสภาพจริงที่เป็นอยู่แล้ว
 - **มีบางแถวที่ column นั้นเป็น `NULL` อยู่** — **migration จะ apply ไม่ผ่าน** Postgres จะปฏิเสธการเพิ่ม `NOT NULL` ถ้ายังมีแถวที่ผิดเงื่อนไขอยู่ มีทางแก้ 2 แบบ:
   1. ใส่ `@default(...)` ใน schema ให้ Prisma backfill ค่า default ให้แถวที่เป็น `NULL` เป็นส่วนหนึ่งของ migration อัตโนมัติ
