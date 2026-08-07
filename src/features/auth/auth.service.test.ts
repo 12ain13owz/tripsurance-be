@@ -9,10 +9,18 @@ const findUnique = vi.fn<(args: { where: { email: string } }) => Promise<User | 
 const compareMock = vi.fn<(password: string, hash: string) => Promise<boolean>>()
 const signAccessTokenMock = vi.fn<(sub: string) => string>(() => 'access-token')
 const signRefreshTokenMock = vi.fn<(sub: string) => string>(() => 'refresh-token')
+const refreshTokenCreateMock =
+  vi.fn<
+    (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) => Promise<unknown>
+  >()
 
 vi.mock('@/core/database/prisma', () => ({
   prisma: {
     user: { findUnique: async (args: { where: { email: string } }) => findUnique(args) },
+    refreshToken: {
+      create: async (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) =>
+        refreshTokenCreateMock(args),
+    },
   },
 }))
 
@@ -24,6 +32,8 @@ vi.mock('bcryptjs', () => ({
 vi.mock('@/core/security', () => ({
   signAccessToken: (sub: string) => signAccessTokenMock(sub),
   signRefreshToken: (sub: string) => signRefreshTokenMock(sub),
+  verifyRefreshToken: () => ({ sub: 'user-1', iat: 0, exp: 1893456000 }),
+  hashToken: (token: string) => `hashed-${token}`,
 }))
 
 const activeUser: User = {
@@ -47,6 +57,7 @@ beforeEach(() => {
   compareMock.mockReset()
   signAccessTokenMock.mockClear()
   signRefreshTokenMock.mockClear()
+  refreshTokenCreateMock.mockReset().mockResolvedValue(undefined)
 })
 
 describe('login', () => {
@@ -77,6 +88,13 @@ describe('login', () => {
     expect(findUnique).toHaveBeenCalledWith({ where: { email: 'jane@example.com' } })
     expect(signAccessTokenMock).toHaveBeenCalledWith('user-1')
     expect(signRefreshTokenMock).toHaveBeenCalledWith('user-1')
+    expect(refreshTokenCreateMock).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        tokenHash: 'hashed-refresh-token',
+        expiresAt: new Date(1893456000 * 1000),
+      },
+    })
   })
 
   it('throws INVALID_CREDENTIALS when no user matches the email', async () => {

@@ -1,7 +1,7 @@
 import { compare, hashSync } from 'bcryptjs'
 import { prisma } from '@/core/database/prisma'
-import { AppError } from '@/core/error'
-import { signAccessToken, signRefreshToken } from '@/core/security'
+import { AppError, wrapUnexpected } from '@/core/error'
+import { hashToken, signAccessToken, signRefreshToken, verifyRefreshToken } from '@/core/security'
 import type { User } from '@/generated/prisma/client'
 import { ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
@@ -11,9 +11,11 @@ const SALT_ROUNDS = 10
 const DUMMY_HASH = hashSync('timing-attack', SALT_ROUNDS)
 
 const authenticateCredentials = async (email: string, password: string): Promise<User> => {
-  const user = await prisma.user.findUnique({
-    where: { email: email },
+  const user = await wrapUnexpected(async () => prisma.user.findUnique({ where: { email } }), {
+    operation: 'login',
+    metadata: { email },
   })
+
   const passwordMatch = await compare(password, user?.password ?? DUMMY_HASH)
 
   if (!user) {
@@ -42,12 +44,26 @@ const toSafeUser = (user: User): SafeUser => {
   return safeUser
 }
 
+const persistRefreshToken = async (userId: string, refreshToken: string): Promise<void> => {
+  const { exp } = verifyRefreshToken(refreshToken)
+
+  await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.create({
+        data: { userId, tokenHash: hashToken(refreshToken), expiresAt: new Date(exp * 1000) },
+      }),
+    { operation: 'login', metadata: { userId } }
+  )
+}
+
 export const login = async (email: string, password: string): Promise<AuthSession> => {
   const user = await authenticateCredentials(email, password)
 
   const safeUser = toSafeUser(user)
   const accessToken = signAccessToken(user.id)
   const refreshToken = signRefreshToken(user.id)
+
+  await persistRefreshToken(user.id, refreshToken)
 
   const data: AuthSession = {
     user: safeUser,
