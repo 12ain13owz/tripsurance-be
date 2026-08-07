@@ -10,11 +10,14 @@ If anything here conflicts with the actual code, the code wins — update this f
 
 A feature-based REST API **starter**: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It ships as a clean base for new projects to build on top of.
 
-Not wired up yet — add inside the existing structure when a consuming project needs it, don't pre-build it speculatively:
+Already wired up in this project (diverged from the bare `node-express-ts-starter` base — check that repo if you need the generic, auth-free version):
 
-- **Database / ORM** — none.
-- **Auth** — none (`req.user`, JWT, sessions, etc. don't exist).
-- **Custom middleware folder** — cors/helmet/rate-limit are plain option objects (`core/config/options.ts`) wired directly in `main.ts`, not middleware functions. There is no `core/middleware/` folder until a feature actually needs one (auth guard, request validation, ...).
+- **Database / ORM** — Prisma (`prisma/schema/`), client exported from `@/core/database/prisma`.
+- **Auth** — JWT access + refresh tokens (`@/core/security/jwt.ts`), sign-in flow in `src/features/auth/`. Refresh token travels as an httpOnly cookie (`auth.cookie.ts`); access token is returned in the response body.
+- **Custom middleware folder** — `src/core/middlewares/` exists, currently `validate.ts` (Zod request validation), wired per-route (see `auth.routes.ts`).
+
+Still not wired up — add only when a consuming feature actually needs it, don't pre-build speculatively:
+
 - **i18n / structured messages** — `AppError`/`createResponse` take a plain `string` message. Do not introduce a `{ key, message, params }` message shape or an i18n layer speculatively; that's a real requirement of specific downstream products, not a default this starter should carry.
 
 ### Testing
@@ -272,11 +275,11 @@ router.use('/auth', authRouter)
 
 ## 7. Middleware
 
-There's no `core/middleware/` folder yet — the only middleware wired up today is third-party (`cors`, `helmet`, `express-rate-limit`, `morgan`), configured as plain options in `core/config/options.ts` and applied directly in `main.ts`. When a feature needs actual custom middleware (auth guard, request validation, etc.):
+Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is configured as plain options in `core/config/options.ts` and applied directly in `main.ts`. Custom middleware lives in `src/core/middlewares/` (see `validate.ts`), one file per concern, exported from its `index.ts`:
 
-- Cross-feature middleware goes in `src/core/middleware/`, one file per concern (`<name>.middleware.ts`), exported from its `index.ts`.
+- Cross-feature middleware goes in `src/core/middlewares/`.
 - Feature-specific middleware can live in the feature folder instead.
-- Wire global middleware in `main.ts`.
+- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`) directly on the route.
 
 ## 8. Definition of done
 
@@ -306,7 +309,7 @@ only complete once all four stages pass and the router is mounted in `src/routes
 - DO add new env vars to the Zod schema (`core/config/env/env.schema.ts`), the `EnvConfig` type (`core/config/env/env.type.ts`), and `.env.example`; use `z.coerce.number()` for numeric ones.
 - DON'T import across features, hardcode response strings, throw raw `Error`, use `any`, read `process.env` directly, or use `console.log`.
 - DON'T put secrets (passwords, tokens) into `AppError` metadata or logs.
-- DON'T add a database, auth, i18n message keys, or a `core/middleware/` folder speculatively — this is a starter; add them when a real feature needs them (see §1).
+- DON'T add i18n message keys speculatively — this is a starter derivative; add them when a real feature needs them (see §1).
 
 ## 10. Commit messages
 
