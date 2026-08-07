@@ -1,0 +1,17 @@
+type: object
+properties:
+  message:
+    type: string
+    example: Signed in successfully
+  timestamp:
+    type: string
+    format: date-time
+    example: '2025-05-29T10:00:00Z'
+  data:
+    type: object
+    properties:
+      user:
+        $ref: './user.schema.yaml'
+      accessToken:
+        type: string
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...

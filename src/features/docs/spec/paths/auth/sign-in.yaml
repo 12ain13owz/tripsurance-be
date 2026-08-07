@@ -1,0 +1,27 @@
+post:
+  tags:
+    - Auth
+  summary: Sign in with email and password
+  operationId: signIn
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/sign-in-request.schema.yaml'
+  responses:
+    '200':
+      description: Signed in successfully
+      headers:
+        Set-Cookie:
+          description: HttpOnly `refreshToken` cookie used to obtain new access tokens.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/sign-in-response.schema.yaml'
+    '401':
+      $ref: '../../components/responses/error.response.yaml'
+    '422':
+      $ref: '../../components/responses/error.response.yaml'

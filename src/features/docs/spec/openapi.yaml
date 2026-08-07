@@ -10,12 +10,16 @@ servers:
 tags:
   - name: Health
     description: Service health checks
+  - name: Auth
+    description: Authentication
 
 paths:
   /health:
     $ref: './paths/health/health.yaml'
   /health/error:
     $ref: './paths/health/error.yaml'
+  /auth/sign-in:
+    $ref: './paths/auth/sign-in.yaml'
 
 components:
   schemas:
@@ -23,6 +27,12 @@ components:
       $ref: './components/models/health.schema.yaml'
     HealthErrorResponse:
       $ref: './components/models/error.schema.yaml'
+    SignInRequest:
+      $ref: './components/models/sign-in-request.schema.yaml'
+    SignInResponse:
+      $ref: './components/models/sign-in-response.schema.yaml'
+    User:
+      $ref: './components/models/user.schema.yaml'
   responses:
     SuccessResponse:
       $ref: './components/responses/success.response.yaml'

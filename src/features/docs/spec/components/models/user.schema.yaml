@@ -1,0 +1,30 @@
+type: object
+properties:
+  id:
+    type: string
+    example: cly1a2b3c0000qzrm5g8h9j0k
+  email:
+    type: string
+    format: email
+    example: jane@example.com
+  firstName:
+    type: string
+    example: Jane
+  lastName:
+    type: string
+    example: Doe
+  role:
+    type: string
+    example: ADMIN
+  isActive:
+    type: boolean
+    example: true
+  isEmailVerified:
+    type: boolean
+    example: true
+  createdAt:
+    type: string
+    format: date-time
+  updatedAt:
+    type: string
+    format: date-time
