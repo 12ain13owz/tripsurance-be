@@ -9,11 +9,13 @@ import type { AuthSession, SafeUser } from './auth.type'
 
 const signInMock = vi.fn<(email: string, password: string) => Promise<AuthSession>>()
 const signOutMock = vi.fn<(refreshToken: string | null) => Promise<void>>()
+const refreshMock = vi.fn<(refreshToken: string) => Promise<AuthSession>>()
 const verifyRefreshToken = vi.fn(() => ({ sub: 'user-1', exp: 1893456000 }))
 
 vi.mock('./auth.service', () => ({
   signIn: async (email: string, password: string) => signInMock(email, password),
   signOut: async (refreshToken: string | null) => signOutMock(refreshToken),
+  refresh: async (refreshToken: string) => refreshMock(refreshToken),
 }))
 
 vi.mock('@/core/security', () => ({
@@ -44,6 +46,7 @@ const session: AuthSession = {
 beforeEach(() => {
   signInMock.mockReset()
   signOutMock.mockReset()
+  refreshMock.mockReset()
   verifyRefreshToken.mockClear()
 })
 
@@ -140,5 +143,57 @@ describe('POST /auth/sign-out', () => {
     const body = res.body as AppResponse<undefined>
     expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
     expect(body.message).toBe('Could not sign out')
+  })
+})
+
+describe('POST /auth/refresh', () => {
+  it('returns 200 with the new session, without refreshToken, and sets a new refreshToken cookie', async () => {
+    refreshMock.mockResolvedValue(session)
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', 'refreshToken=old-refresh-token')
+    const body = res.body as AppResponse<{
+      user: SafeUser
+      accessToken: string
+      refreshToken?: string
+    }>
+    const cookies = res.headers['set-cookie'] as unknown as string[]
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(AUTH_MESSAGES.REFRESH)
+    expect(body.data?.accessToken).toBe('access-token')
+    expect(body.data?.refreshToken).toBeUndefined()
+    expect(cookies.some((cookie) => cookie.startsWith('refreshToken=refresh-token'))).toBe(true)
+  })
+
+  it('passes the cookie value straight through to the service', async () => {
+    refreshMock.mockResolvedValue(session)
+
+    await request(app).post('/auth/refresh').set('Cookie', 'refreshToken=old-refresh-token')
+    expect(refreshMock).toHaveBeenCalledWith('old-refresh-token')
+  })
+
+  it('returns 401 MISSING_TOKEN and does not call the service when there is no refreshToken cookie', async () => {
+    const res = await request(app).post('/auth/refresh')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(AUTH_ERRORS.MISSING_TOKEN)
+    expect(refreshMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards a service AppError (e.g. a reused or invalid token) to the error handler', async () => {
+    refreshMock.mockRejectedValue(
+      new AppError(AUTH_ERRORS.INVALID_TOKEN, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+    )
+
+    const res = await request(app)
+      .post('/auth/refresh')
+      .set('Cookie', 'refreshToken=old-refresh-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(AUTH_ERRORS.INVALID_TOKEN)
   })
 })

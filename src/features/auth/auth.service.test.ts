@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/error'
 import type { User } from '@/generated/prisma/client'
-import { ERRORS, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
-import { signIn, signOut } from './auth.service'
+import { refresh, signIn, signOut } from './auth.service'
 
-const findUnique = vi.fn<(args: { where: { email: string } }) => Promise<User | null>>()
+const findUnique =
+  vi.fn<(args: { where: { email: string } | { id: string } }) => Promise<User | null>>()
 const compareMock = vi.fn<(password: string, hash: string) => Promise<boolean>>()
 const signAccessTokenMock = vi.fn<(sub: string) => string>(() => 'access-token')
 const signRefreshTokenMock = vi.fn<(sub: string) => string>(() => 'refresh-token')
+const verifyRefreshTokenMock = vi.fn<(token: string) => { sub: string; iat: number; exp: number }>()
 const refreshTokenCreateMock =
   vi.fn<
     (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) => Promise<unknown>
@@ -16,19 +18,23 @@ const refreshTokenCreateMock =
 const refreshTokenUpdateManyMock =
   vi.fn<
     (args: {
-      where: { tokenHash: string }
+      where: { tokenHash: string; revokedAt: null }
       data: { revokedAt: Date }
     }) => Promise<{ count: number }>
   >()
 
 vi.mock('@/core/database/prisma', () => ({
   prisma: {
-    user: { findUnique: async (args: { where: { email: string } }) => findUnique(args) },
+    user: {
+      findUnique: async (args: { where: { email: string } | { id: string } }) => findUnique(args),
+    },
     refreshToken: {
       create: async (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) =>
         refreshTokenCreateMock(args),
-      updateMany: async (args: { where: { tokenHash: string }; data: { revokedAt: Date } }) =>
-        refreshTokenUpdateManyMock(args),
+      updateMany: async (args: {
+        where: { tokenHash: string; revokedAt: null }
+        data: { revokedAt: Date }
+      }) => refreshTokenUpdateManyMock(args),
     },
   },
 }))
@@ -41,7 +47,7 @@ vi.mock('bcryptjs', () => ({
 vi.mock('@/core/security', () => ({
   signAccessToken: (sub: string) => signAccessTokenMock(sub),
   signRefreshToken: (sub: string) => signRefreshTokenMock(sub),
-  verifyRefreshToken: () => ({ sub: 'user-1', iat: 0, exp: 1893456000 }),
+  verifyRefreshToken: (token: string) => verifyRefreshTokenMock(token),
   hashToken: (token: string) => `hashed-${token}`,
 }))
 
@@ -66,6 +72,7 @@ beforeEach(() => {
   compareMock.mockReset()
   signAccessTokenMock.mockClear()
   signRefreshTokenMock.mockClear()
+  verifyRefreshTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
   refreshTokenCreateMock.mockReset().mockResolvedValue(undefined)
   refreshTokenUpdateManyMock.mockReset().mockResolvedValue({ count: 1 })
 })
@@ -163,7 +170,7 @@ describe('signOut', () => {
 
     await signOut('refresh-token')
     expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
-      where: { tokenHash: 'hashed-refresh-token' },
+      where: { tokenHash: 'hashed-refresh-token', revokedAt: null },
       data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
     })
   })
@@ -174,6 +181,90 @@ describe('signOut', () => {
     await expect(signOut('refresh-token')).rejects.toMatchObject({
       message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
       status: HttpStatus.INTERNAL_SERVER_ERROR,
+    })
+  })
+})
+
+describe('refresh', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('revokes the presented token, rotates the pair, and returns the new session', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+    findUnique.mockResolvedValue(activeUser)
+
+    const session = await refresh('old-refresh-token')
+
+    expect(session).toEqual({
+      user: {
+        id: 'user-1',
+        email: 'jane@example.com',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        role: 'ADMIN',
+        isActive: true,
+        isEmailVerified: true,
+        invitedById: null,
+        invitationTokenHash: null,
+        lastInvitationSentAt: null,
+        createdAt: activeUser.createdAt,
+        updatedAt: activeUser.updatedAt,
+      },
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+    })
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { tokenHash: 'hashed-old-refresh-token', revokedAt: null },
+      data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
+    })
+    expect(refreshTokenCreateMock).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        tokenHash: 'hashed-refresh-token',
+        expiresAt: new Date(1893456000 * 1000),
+      },
+    })
+  })
+
+  it('throws INVALID_TOKEN and mints nothing when the token was already used (reuse detection)', async () => {
+    refreshTokenUpdateManyMock.mockResolvedValue({ count: 0 })
+
+    await expect(refresh('old-refresh-token')).rejects.toMatchObject({
+      message: AUTH_ERRORS.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+    expect(findUnique).not.toHaveBeenCalled()
+    expect(refreshTokenCreateMock).not.toHaveBeenCalled()
+  })
+
+  it('propagates the AppError from a malformed or expired token without touching the database', async () => {
+    verifyRefreshTokenMock.mockImplementationOnce(() => {
+      throw new AppError(ERRORS.GENERIC.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+    })
+
+    await expect(refresh('garbage-token')).rejects.toBeInstanceOf(AppError)
+    expect(refreshTokenUpdateManyMock).not.toHaveBeenCalled()
+  })
+
+  it('still revokes the presented token even when the account has since been disabled', async () => {
+    findUnique.mockResolvedValue({ ...activeUser, isActive: false })
+
+    await expect(refresh('old-refresh-token')).rejects.toMatchObject({
+      message: AUTH_ERRORS.ACCOUNT_DISABLED,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalled()
+    expect(refreshTokenCreateMock).not.toHaveBeenCalled()
+  })
+
+  it('throws INVALID_TOKEN when the user tied to the token no longer exists', async () => {
+    findUnique.mockResolvedValue(null)
+
+    await expect(refresh('old-refresh-token')).rejects.toMatchObject({
+      message: AUTH_ERRORS.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
     })
   })
 })
