@@ -3,7 +3,7 @@ import { AppError } from '@/core/error'
 import type { User } from '@/generated/prisma/client'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
-import { refresh, signIn, signOut } from './auth.service'
+import { getProfile, refresh, signIn, signOut } from './auth.service'
 
 const findUnique =
   vi.fn<(args: { where: { email: string } | { id: string } }) => Promise<User | null>>()
@@ -264,6 +264,47 @@ describe('refresh', () => {
 
     await expect(refresh('old-refresh-token')).rejects.toMatchObject({
       message: ERRORS.AUTH.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+})
+
+describe('getProfile', () => {
+  it('returns the password-free profile for an existing, active user', async () => {
+    findUnique.mockResolvedValue(activeUser)
+
+    const profile = await getProfile('user-1')
+    expect(profile).toEqual({
+      id: 'user-1',
+      email: 'jane@example.com',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      role: 'ADMIN',
+      isActive: true,
+      isEmailVerified: true,
+      invitedById: null,
+      invitationTokenHash: null,
+      lastInvitationSentAt: null,
+      createdAt: activeUser.createdAt,
+      updatedAt: activeUser.updatedAt,
+    })
+    expect(findUnique).toHaveBeenCalledWith({ where: { id: 'user-1' } })
+  })
+
+  it('throws INVALID_TOKEN when the user id no longer matches an existing user', async () => {
+    findUnique.mockResolvedValue(null)
+
+    await expect(getProfile('deleted-user')).rejects.toMatchObject({
+      message: ERRORS.AUTH.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+
+  it('throws ACCOUNT_DISABLED when the user has been deactivated', async () => {
+    findUnique.mockResolvedValue({ ...activeUser, isActive: false })
+
+    await expect(getProfile('user-1')).rejects.toMatchObject({
+      message: AUTH_ERRORS.ACCOUNT_DISABLED,
       status: HttpStatus.UNAUTHORIZED,
     })
   })

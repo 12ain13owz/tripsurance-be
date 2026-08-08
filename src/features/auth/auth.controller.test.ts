@@ -10,16 +10,20 @@ import type { AuthSession, SafeUser } from './auth.type'
 const signInMock = vi.fn<(email: string, password: string) => Promise<AuthSession>>()
 const signOutMock = vi.fn<(refreshToken: string | null) => Promise<void>>()
 const refreshMock = vi.fn<(refreshToken: string) => Promise<AuthSession>>()
+const getProfileMock = vi.fn<(userId: string) => Promise<SafeUser>>()
 const verifyRefreshToken = vi.fn(() => ({ sub: 'user-1', exp: 1893456000 }))
+const verifyAccessTokenMock = vi.fn<(token: string) => { sub: string; iat: number; exp: number }>()
 
 vi.mock('./auth.service', () => ({
   signIn: async (email: string, password: string) => signInMock(email, password),
   signOut: async (refreshToken: string | null) => signOutMock(refreshToken),
   refresh: async (refreshToken: string) => refreshMock(refreshToken),
+  getProfile: async (userId: string) => getProfileMock(userId),
 }))
 
 vi.mock('@/core/security', () => ({
   verifyRefreshToken: () => verifyRefreshToken(),
+  verifyAccessToken: (token: string) => verifyAccessTokenMock(token),
 }))
 
 const app = createApp()
@@ -47,7 +51,9 @@ beforeEach(() => {
   signInMock.mockReset()
   signOutMock.mockReset()
   refreshMock.mockReset()
+  getProfileMock.mockReset()
   verifyRefreshToken.mockClear()
+  verifyAccessTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
 })
 
 describe('POST /auth/sign-in', () => {
@@ -195,5 +201,57 @@ describe('POST /auth/refresh', () => {
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
     expect(body.message).toBe(ERRORS.AUTH.INVALID_TOKEN)
+  })
+})
+
+describe('GET /auth/me', () => {
+  it('returns 200 with the current user profile for a valid bearer token', async () => {
+    getProfileMock.mockResolvedValue(session.user)
+
+    const res = await request(app).get('/auth/me').set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<SafeUser>
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(AUTH_MESSAGES.ME)
+    expect(body.data).toEqual({
+      ...session.user,
+      createdAt: session.user.createdAt.toISOString(),
+      updatedAt: session.user.updatedAt.toISOString(),
+    })
+    expect(getProfileMock).toHaveBeenCalledWith('user-1')
+  })
+
+  it('returns 401 MISSING_TOKEN and never calls the service when there is no Authorization header', async () => {
+    const res = await request(app).get('/auth/me')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
+    expect(getProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 401 and never calls the service when the bearer token is invalid or expired', async () => {
+    verifyAccessTokenMock.mockImplementation(() => {
+      throw new AppError(ERRORS.GENERIC.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+    })
+
+    const res = await request(app).get('/auth/me').set('Authorization', 'Bearer garbage')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(ERRORS.GENERIC.UNAUTHORIZED)
+    expect(getProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards a service AppError (e.g. the account was disabled) to the error handler', async () => {
+    getProfileMock.mockRejectedValue(
+      new AppError(AUTH_ERRORS.ACCOUNT_DISABLED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+    )
+
+    const res = await request(app).get('/auth/me').set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(AUTH_ERRORS.ACCOUNT_DISABLED)
   })
 })
