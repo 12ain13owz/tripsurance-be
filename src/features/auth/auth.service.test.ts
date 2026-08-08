@@ -3,7 +3,7 @@ import { AppError } from '@/core/error'
 import type { User } from '@/generated/prisma/client'
 import { HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
-import { login } from './auth.service'
+import { signIn } from './auth.service'
 
 const findUnique = vi.fn<(args: { where: { email: string } }) => Promise<User | null>>()
 const compareMock = vi.fn<(password: string, hash: string) => Promise<boolean>>()
@@ -60,12 +60,12 @@ beforeEach(() => {
   refreshTokenCreateMock.mockReset().mockResolvedValue(undefined)
 })
 
-describe('login', () => {
+describe('signIn', () => {
   it('returns a session with tokens and a password-free user on valid credentials', async () => {
     findUnique.mockResolvedValue(activeUser)
     compareMock.mockResolvedValue(true)
 
-    const session = await login('jane@example.com', 'correct-password')
+    const session = await signIn('jane@example.com', 'correct-password')
 
     expect(session).toEqual({
       user: {
@@ -101,18 +101,18 @@ describe('login', () => {
     findUnique.mockResolvedValue(null)
     compareMock.mockResolvedValue(false)
 
-    await expect(login('missing@example.com', 'whatever')).rejects.toMatchObject({
+    await expect(signIn('missing@example.com', 'whatever')).rejects.toMatchObject({
       message: AUTH_ERRORS.INVALID_CREDENTIALS,
       status: HttpStatus.UNAUTHORIZED,
     })
-    await expect(login('missing@example.com', 'whatever')).rejects.toBeInstanceOf(AppError)
+    await expect(signIn('missing@example.com', 'whatever')).rejects.toBeInstanceOf(AppError)
   })
 
   it('throws INVALID_CREDENTIALS when the password does not match', async () => {
     findUnique.mockResolvedValue(activeUser)
     compareMock.mockResolvedValue(false)
 
-    await expect(login('jane@example.com', 'wrong-password')).rejects.toMatchObject({
+    await expect(signIn('jane@example.com', 'wrong-password')).rejects.toMatchObject({
       message: AUTH_ERRORS.INVALID_CREDENTIALS,
       status: HttpStatus.UNAUTHORIZED,
     })
@@ -122,7 +122,7 @@ describe('login', () => {
     findUnique.mockResolvedValue(null)
     compareMock.mockResolvedValue(false)
 
-    await expect(login('missing@example.com', 'whatever')).rejects.toThrow()
+    await expect(signIn('missing@example.com', 'whatever')).rejects.toThrow()
     expect(compareMock).toHaveBeenCalledWith('whatever', 'dummy-hash')
   })
 
@@ -130,7 +130,7 @@ describe('login', () => {
     findUnique.mockResolvedValue({ ...activeUser, isActive: false })
     compareMock.mockResolvedValue(true)
 
-    await expect(login('jane@example.com', 'correct-password')).rejects.toMatchObject({
+    await expect(signIn('jane@example.com', 'correct-password')).rejects.toMatchObject({
       message: AUTH_ERRORS.ACCOUNT_DISABLED,
       status: HttpStatus.UNAUTHORIZED,
     })

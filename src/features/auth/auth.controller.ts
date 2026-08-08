@@ -2,10 +2,10 @@ import { verifyRefreshToken } from '@/core/security'
 import { HttpStatus } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
 import { AUTH_MESSAGES } from './auth.const'
-import { setRefreshCookie } from './auth.cookie'
+import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './auth.cookie'
 import * as authService from './auth.service'
 import type { AuthReq, SignInData } from './auth.type'
-import type { Response, NextFunction } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 
 export const signIn = async (
   req: AuthReq<'signIn'>,
@@ -14,13 +14,26 @@ export const signIn = async (
 ): Promise<void> => {
   try {
     const { email, password } = req.body
-    const { refreshToken, ...session } = await authService.login(email, password)
+    const { refreshToken, ...session } = await authService.signIn(email, password)
     const { exp } = verifyRefreshToken(refreshToken)
 
     setRefreshCookie(res, refreshToken, exp)
 
     const data: SignInData = session
     const response = createResponse(AUTH_MESSAGES.SIGN_IN, data)
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const signOut = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const refreshToken = readRefreshCookie(req)
+    await authService.signOut(refreshToken)
+
+    clearRefreshCookie(res)
+    const response = createResponse(AUTH_MESSAGES.SIGN_OUT)
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)

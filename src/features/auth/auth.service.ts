@@ -56,7 +56,7 @@ const persistRefreshToken = async (userId: string, refreshToken: string): Promis
   )
 }
 
-export const login = async (email: string, password: string): Promise<AuthSession> => {
+export const signIn = async (email: string, password: string): Promise<AuthSession> => {
   const user = await authenticateCredentials(email, password)
 
   const safeUser = toSafeUser(user)
@@ -72,4 +72,23 @@ export const login = async (email: string, password: string): Promise<AuthSessio
   }
 
   return data
+}
+
+export const signOut = async (refreshToken: string | null): Promise<void> => {
+  if (!refreshToken) {
+    return
+  }
+
+  const refreshTokenHash = hashToken(refreshToken)
+  await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.updateMany({
+        where: { tokenHash: refreshTokenHash },
+        data: { revokedAt: new Date() },
+      }),
+    {
+      operation: 'logout',
+      metadata: { tokenHash: refreshTokenHash },
+    }
+  )
 }

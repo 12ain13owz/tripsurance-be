@@ -1,5 +1,6 @@
 export const AUTH_MESSAGES = {
   SIGN_IN: 'Signed in successfully',
+  SIGN_OUT: 'Signed out successfully',
 }
 
 export const AUTH_ERRORS = {

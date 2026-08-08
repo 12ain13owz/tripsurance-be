@@ -41,12 +41,12 @@ export const clearRefreshCookie = (res: Response): void => {
   )
 }
 
-export const readRefreshCookie = (req: Pick<Request, 'headers'>): string | undefined => {
+export const readRefreshCookie = (req: Pick<Request, 'headers'>): string | null => {
   const header = req.headers.cookie
   if (!header) {
-    return undefined
+    return null
   }
 
   // eslint-disable-next-line security/detect-object-injection
-  return parseCookie(header)[REFRESH_COOKIE_NAME]
+  return parseCookie(header)[REFRESH_COOKIE_NAME] ?? null
 }
