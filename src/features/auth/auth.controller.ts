@@ -1,5 +1,5 @@
 import { AppError } from '@/core/error'
-import type { AuthenticatedRequest } from '@/core/middlewares/authenticate'
+import type { AuthenticatedRequest } from '@/core/middleware/authenticate'
 import { verifyRefreshToken } from '@/core/security'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
