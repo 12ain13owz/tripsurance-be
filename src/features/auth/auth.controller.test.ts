@@ -4,14 +4,16 @@ import { createApp } from '@/app'
 import { AppError } from '@/core/error'
 import { ErrorSeverity, HttpStatus } from '@/shared/constants'
 import type { AppResponse } from '@/shared/types'
-import { AUTH_ERRORS } from './auth.const'
+import { AUTH_ERRORS, AUTH_MESSAGES } from './auth.const'
 import type { AuthSession, SafeUser } from './auth.type'
 
-const login = vi.fn<(email: string, password: string) => Promise<AuthSession>>()
+const signInMock = vi.fn<(email: string, password: string) => Promise<AuthSession>>()
+const signOutMock = vi.fn<(refreshToken: string | null) => Promise<void>>()
 const verifyRefreshToken = vi.fn(() => ({ sub: 'user-1', exp: 1893456000 }))
 
 vi.mock('./auth.service', () => ({
-  login: async (email: string, password: string) => login(email, password),
+  signIn: async (email: string, password: string) => signInMock(email, password),
+  signOut: async (refreshToken: string | null) => signOutMock(refreshToken),
 }))
 
 vi.mock('@/core/security', () => ({
@@ -40,13 +42,14 @@ const session: AuthSession = {
 }
 
 beforeEach(() => {
-  login.mockReset()
+  signInMock.mockReset()
+  signOutMock.mockReset()
   verifyRefreshToken.mockClear()
 })
 
 describe('POST /auth/sign-in', () => {
   it('returns 200 with the user and access token, without the refresh token, on valid credentials', async () => {
-    login.mockResolvedValue(session)
+    signInMock.mockResolvedValue(session)
 
     const res = await request(app).post('/auth/sign-in').send(validBody)
     const body = res.body as AppResponse<{
@@ -66,7 +69,7 @@ describe('POST /auth/sign-in', () => {
   })
 
   it('sets an httpOnly refreshToken cookie on valid credentials', async () => {
-    login.mockResolvedValue(session)
+    signInMock.mockResolvedValue(session)
 
     const res = await request(app).post('/auth/sign-in').send(validBody)
     const cookies = res.headers['set-cookie'] as unknown as string[]
@@ -81,11 +84,11 @@ describe('POST /auth/sign-in', () => {
       .send({ email: 'not-an-email', password: 'short' })
 
     expect(res.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY)
-    expect(login).not.toHaveBeenCalled()
+    expect(signInMock).not.toHaveBeenCalled()
   })
 
   it('forwards a service AppError to the error handler with its status and message', async () => {
-    login.mockRejectedValue(
+    signInMock.mockRejectedValue(
       new AppError(AUTH_ERRORS.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
     )
 
@@ -94,5 +97,48 @@ describe('POST /auth/sign-in', () => {
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
     expect(body.message).toBe(AUTH_ERRORS.INVALID_CREDENTIALS)
+  })
+})
+
+describe('POST /auth/sign-out', () => {
+  it('returns 200 with the sign-out message and clears the refreshToken cookie', async () => {
+    signOutMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .post('/auth/sign-out')
+      .set('Cookie', 'refreshToken=refresh-token')
+    const body = res.body as AppResponse<undefined>
+    const cookies = res.headers['set-cookie'] as unknown as string[]
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(AUTH_MESSAGES.SIGN_OUT)
+    expect(cookies.some((cookie) => cookie.startsWith('refreshToken=;'))).toBe(true)
+    expect(cookies.some((cookie) => /Max-Age=0/.test(cookie))).toBe(true)
+  })
+
+  it('passes the cookie value straight through to the service', async () => {
+    signOutMock.mockResolvedValue(undefined)
+
+    await request(app).post('/auth/sign-out').set('Cookie', 'refreshToken=refresh-token')
+    expect(signOutMock).toHaveBeenCalledWith('refresh-token')
+  })
+
+  it('still returns 200 and calls the service with null when there is no refreshToken cookie', async () => {
+    signOutMock.mockResolvedValue(undefined)
+
+    const res = await request(app).post('/auth/sign-out')
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(signOutMock).toHaveBeenCalledWith(null)
+  })
+
+  it('forwards a service AppError to the error handler with its status and message', async () => {
+    signOutMock.mockRejectedValue(
+      new AppError('Could not sign out', HttpStatus.INTERNAL_SERVER_ERROR, ErrorSeverity.ERROR)
+    )
+
+    const res = await request(app).post('/auth/sign-out')
+    const body = res.body as AppResponse<undefined>
+    expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(body.message).toBe('Could not sign out')
   })
 })

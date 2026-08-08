@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/error'
 import type { User } from '@/generated/prisma/client'
-import { HttpStatus } from '@/shared/constants'
+import { ERRORS, HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
-import { signIn } from './auth.service'
+import { signIn, signOut } from './auth.service'
 
 const findUnique = vi.fn<(args: { where: { email: string } }) => Promise<User | null>>()
 const compareMock = vi.fn<(password: string, hash: string) => Promise<boolean>>()
@@ -13,6 +13,13 @@ const refreshTokenCreateMock =
   vi.fn<
     (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) => Promise<unknown>
   >()
+const refreshTokenUpdateManyMock =
+  vi.fn<
+    (args: {
+      where: { tokenHash: string }
+      data: { revokedAt: Date }
+    }) => Promise<{ count: number }>
+  >()
 
 vi.mock('@/core/database/prisma', () => ({
   prisma: {
@@ -20,6 +27,8 @@ vi.mock('@/core/database/prisma', () => ({
     refreshToken: {
       create: async (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) =>
         refreshTokenCreateMock(args),
+      updateMany: async (args: { where: { tokenHash: string }; data: { revokedAt: Date } }) =>
+        refreshTokenUpdateManyMock(args),
     },
   },
 }))
@@ -58,6 +67,7 @@ beforeEach(() => {
   signAccessTokenMock.mockClear()
   signRefreshTokenMock.mockClear()
   refreshTokenCreateMock.mockReset().mockResolvedValue(undefined)
+  refreshTokenUpdateManyMock.mockReset().mockResolvedValue({ count: 1 })
 })
 
 describe('signIn', () => {
@@ -133,6 +143,37 @@ describe('signIn', () => {
     await expect(signIn('jane@example.com', 'correct-password')).rejects.toMatchObject({
       message: AUTH_ERRORS.ACCOUNT_DISABLED,
       status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+})
+
+describe('signOut', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('does nothing when there is no refresh token', async () => {
+    await expect(signOut(null)).resolves.toBeUndefined()
+    expect(refreshTokenUpdateManyMock).not.toHaveBeenCalled()
+  })
+
+  it('revokes the refresh token by its hash', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+
+    await signOut('refresh-token')
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { tokenHash: 'hashed-refresh-token' },
+      data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
+    })
+  })
+
+  it('wraps an unexpected DB failure into a generic AppError instead of leaking it', async () => {
+    refreshTokenUpdateManyMock.mockRejectedValue(new Error('connection refused'))
+
+    await expect(signOut('refresh-token')).rejects.toMatchObject({
+      message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
     })
   })
 })

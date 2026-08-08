@@ -80,13 +80,13 @@ describe('readRefreshCookie', () => {
     expect(value).toBe('abc123')
   })
 
-  it('returns undefined when there is no cookie header at all', async () => {
+  it('returns null when there is no cookie header at all', async () => {
     const { readRefreshCookie } = await loadAuthCookie(AppEnv.DEVELOPMENT)
-    expect(readRefreshCookie(makeReq(undefined))).toBeUndefined()
+    expect(readRefreshCookie(makeReq(undefined))).toBeNull()
   })
 
-  it('returns undefined when the cookie header does not include refreshToken', async () => {
+  it('returns null when the cookie header does not include refreshToken', async () => {
     const { readRefreshCookie } = await loadAuthCookie(AppEnv.DEVELOPMENT)
-    expect(readRefreshCookie(makeReq('other=1; theme=dark'))).toBeUndefined()
+    expect(readRefreshCookie(makeReq('other=1; theme=dark'))).toBeNull()
   })
 })
