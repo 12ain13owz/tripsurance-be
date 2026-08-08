@@ -10,6 +10,11 @@ import type { AuthSession, SafeUser } from './auth.type'
 const SALT_ROUNDS = 10
 const DUMMY_HASH = hashSync('timing-attack', SALT_ROUNDS)
 
+// ------------------------------------------------------------------------------
+// Helpers (not exported)
+// TODO: move to a separate file if this list keeps growing
+// ------------------------------------------------------------------------------
+
 const authenticateCredentials = async (email: string, password: string): Promise<User> => {
   const user = await wrapUnexpected(async () => prisma.user.findUnique({ where: { email } }), {
     operation: 'login',
@@ -44,7 +49,30 @@ const toSafeUser = (user: User): SafeUser => {
   return safeUser
 }
 
-const persistRefreshToken = async (userId: string, refreshToken: string): Promise<void> => {
+const findUserById = async (userId: string): Promise<User> => {
+  const user = await wrapUnexpected(async () => prisma.user.findUnique({ where: { id: userId } }), {
+    operation: 'refresh',
+    metadata: { userId },
+  })
+
+  if (!user) {
+    throw invalidToken('refresh')
+  }
+
+  if (!user.isActive) {
+    throw new AppError(AUTH_ERRORS.ACCOUNT_DISABLED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+      .withOperation('refresh')
+      .withMetadata({ userId })
+  }
+
+  return user
+}
+
+const persistRefreshToken = async (
+  userId: string,
+  refreshToken: string,
+  operation: string
+): Promise<void> => {
   const { exp } = verifyRefreshToken(refreshToken)
 
   await wrapUnexpected(
@@ -52,21 +80,43 @@ const persistRefreshToken = async (userId: string, refreshToken: string): Promis
       prisma.refreshToken.create({
         data: { userId, tokenHash: hashToken(refreshToken), expiresAt: new Date(exp * 1000) },
       }),
-    { operation: 'login', metadata: { userId } }
+    { operation, metadata: { userId } }
   )
 }
 
+const revokeRefreshToken = async (refreshToken: string, operation: string): Promise<boolean> => {
+  const tokenHash = hashToken(refreshToken)
+  const { count } = await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.updateMany({
+        where: { tokenHash, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    { operation, metadata: { tokenHash } }
+  )
+
+  return count > 0
+}
+
+const invalidToken = (operation: string): AppError =>
+  new AppError(
+    AUTH_ERRORS.INVALID_TOKEN,
+    HttpStatus.UNAUTHORIZED,
+    ErrorSeverity.WARN
+  ).withOperation(operation)
+
+// ------------------------------------------------------------------------------
+// * Exported
+// ------------------------------------------------------------------------------
+
 export const signIn = async (email: string, password: string): Promise<AuthSession> => {
   const user = await authenticateCredentials(email, password)
-
-  const safeUser = toSafeUser(user)
   const accessToken = signAccessToken(user.id)
   const refreshToken = signRefreshToken(user.id)
-
-  await persistRefreshToken(user.id, refreshToken)
+  await persistRefreshToken(user.id, refreshToken, 'signIn')
 
   const data: AuthSession = {
-    user: safeUser,
+    user: toSafeUser(user),
     accessToken,
     refreshToken,
   }
@@ -79,16 +129,31 @@ export const signOut = async (refreshToken: string | null): Promise<void> => {
     return
   }
 
-  const refreshTokenHash = hashToken(refreshToken)
-  await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.updateMany({
-        where: { tokenHash: refreshTokenHash },
-        data: { revokedAt: new Date() },
-      }),
-    {
-      operation: 'logout',
-      metadata: { tokenHash: refreshTokenHash },
-    }
-  )
+  await revokeRefreshToken(refreshToken, 'logout')
+}
+
+export const refresh = async (refreshToken: string): Promise<AuthSession> => {
+  const { sub: userId } = verifyRefreshToken(refreshToken)
+
+  if (!userId) {
+    throw invalidToken('refresh')
+  }
+
+  const revoked = await revokeRefreshToken(refreshToken, 'refresh')
+  if (!revoked) {
+    throw invalidToken('refresh')
+  }
+
+  const user = await findUserById(userId)
+  const newAccessToken = signAccessToken(userId)
+  const newRefreshToken = signRefreshToken(userId)
+  await persistRefreshToken(userId, newRefreshToken, 'refresh')
+
+  const data: AuthSession = {
+    user: toSafeUser(user),
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  }
+
+  return data
 }
