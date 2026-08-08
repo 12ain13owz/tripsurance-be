@@ -21,8 +21,8 @@ Technically, it's a feature-based REST API: **Node.js (ESM) + Express 5 + TypeSc
 Already wired up in this project (diverged from the bare `node-express-ts-starter` base — check that repo if you need the generic, auth-free version):
 
 - **Database / ORM** — Prisma (`prisma/schema/`), client exported from `@/core/database/prisma`.
-- **Auth** — JWT access + refresh tokens (`@/core/security/jwt.ts`), sign-in flow in `src/features/auth/`. Refresh token travels as an httpOnly cookie (`auth.cookie.ts`); access token is returned in the response body.
-- **Custom middleware folder** — `src/core/middlewares/` exists, currently `validate.ts` (Zod request validation), wired per-route (see `auth.routes.ts`).
+- **Auth** — JWT access + refresh tokens (`@/core/security/jwt.ts`), sign-in/refresh/sign-out flows in `src/features/auth/`. Refresh token travels as an httpOnly cookie (`auth.cookie.ts`); access token is returned in the response body and expected as a `Bearer` header on protected routes.
+- **Custom middleware folder** — `src/core/middleware/` exists: `validate.ts` (Zod request validation) and `authenticate.ts` (verifies the access token, attaches the payload to `req.user`), each wired per-route (see `auth.routes.ts`).
 
 Still not wired up — add only when a consuming feature actually needs it, don't pre-build speculatively:
 
@@ -51,10 +51,11 @@ When tests are requested, follow this standard so output stays consistent across
 ```
 src/
   core/      # Infrastructure, app-wide. Knows nothing about specific features.
-    config/    # env loading + Zod validation, runtime options (cors/helmet/rate-limit)
-    error/     # AppError, error logger, error middleware
-    logger/    # Winston setup
-    server/    # bootstrap + graceful shutdown
+    config/     # env loading + Zod validation, runtime options (cors/helmet/rate-limit)
+    error/      # AppError, error logger, error middleware
+    logger/     # Winston setup
+    middleware/ # custom route middleware (validate, authenticate)
+    server/     # bootstrap + graceful shutdown
   features/  # Business features. One folder per feature. May import core + shared.
   shared/    # Pure building blocks (constants, types, utils). No feature/business logic.
   main.ts    # Entry point: middleware wiring + startServer
@@ -128,11 +129,13 @@ features  ->  shared
 | Service          | `<feature>.service.ts`    | `auth.service.ts`             |
 | Validation (Zod) | `<feature>.schema.ts`     | `auth.schema.ts`              |
 | Types            | `<feature>.type.ts`       | `auth.type.ts`                |
-| Middleware       | `<name>.middleware.ts`    | `authenticate.middleware.ts`  |
+| Middleware       | `<name>.ts`               | `authenticate.ts`             |
 | Constants        | `<name>.const.ts`         | `message.const.ts`            |
 | Barrel           | `index.ts`                | re-exports the public surface |
 
 Skip files you genuinely don't need — e.g. `src/features/health/` only has `health.routes.ts` + `health.controller.ts` (no service, no schema) because there's nothing to validate or delegate. Keep the naming when you do add a file.
+
+Middleware is the one exception to the role-suffix rule: files under `src/core/middleware/` (e.g. `validate.ts`, `authenticate.ts`) skip the `.middleware.ts` suffix — the folder itself already says "middleware", so the suffix would be redundant. Feature-local middleware, if a feature ever needs its own, follows the same no-suffix rule.
 
 **Messages:** generic, reusable text (CRUD success/fail wording, HTTP-generic errors) belongs in `SUCCESS`/`ERRORS` in `shared/constants/message.const.ts` — extend it, don't duplicate. A feature may keep its own `<feature>.const.ts` (e.g. `auth.const.ts`) only for messages specific to that feature's domain (e.g. "Invalid email or password") that wouldn't make sense reused elsewhere. Default to the shared file when in doubt.
 
@@ -301,11 +304,30 @@ router.use('/auth', authRouter)
 
 ## 7. Middleware
 
-Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is configured as plain options in `core/config/options.ts` and applied directly in `main.ts`. Custom middleware lives in `src/core/middlewares/` (see `validate.ts`), one file per concern, exported from its `index.ts`:
+Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is configured as plain options in `core/config/options.ts` and applied directly in `main.ts`. Custom middleware lives in `src/core/middleware/` (see `validate.ts`, `authenticate.ts`), one file per concern, exported from its `index.ts`:
 
-- Cross-feature middleware goes in `src/core/middlewares/`.
+- Cross-feature middleware goes in `src/core/middleware/`.
 - Feature-specific middleware can live in the feature folder instead.
-- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`) directly on the route.
+- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route.
+
+### Typed `req` narrowing (`authenticate` + `AuthenticatedRequest`)
+
+`authenticate` (`core/middleware/authenticate.ts`) verifies the `Authorization: Bearer` access token and sets `req.user` to the decoded payload before calling `next()`; `req.user` is `AccessTokenPayload | undefined` globally (`core/types/express.d.ts`) since most routes aren't authenticated. For a route that *is* behind `authenticate`, don't re-check `req.user` for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead, type the controller's `req` param as `AuthenticatedRequest` (exported from `authenticate.ts`), which narrows `user` to always-present:
+
+```ts
+export const me = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data: SafeUser = await authService.getProfile(req.user.sub) // no `?`, no null check
+    ...
+```
+
+Express's `RequestHandler` type can't structurally accept a handler whose `req` is narrower than the base `Request` (its `user` field isn't a generic slot like `body`/`params`/`query`, so Express can't infer it) — wrap the handler with `asHandler` (`shared/utils/handler.util.ts`) at the route registration site to bridge it:
+
+```ts
+router.get('/me', authenticate, asHandler(authController.me))
+```
+
+`asHandler` is a generic, dependency-free adapter (`<TReq>(handler) => RequestHandler`) — it belongs in `shared/` because it doesn't know about `AuthenticatedRequest` or any other concrete type; `TReq` is inferred from whatever handler you pass in, so you never need to write the type argument explicitly. Reuse the same `asHandler` for any other middleware that narrows `req` beyond what Express's own generics express — don't write a new one-off adapter per middleware.
 
 ## 8. Definition of done
 
