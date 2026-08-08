@@ -37,6 +37,10 @@ export const ERRORS = {
     UNSPECIFIED_FUNCTION: 'Unspecified function',
     INVALID_JSON_BODY: 'Invalid JSON in request body',
   },
+  AUTH: {
+    MISSING_TOKEN: 'Authentication required',
+    INVALID_TOKEN: 'Invalid or expired token',
+  },
   UTIL: {
     notFound: (item: string) => `${item} not found`,
     alreadyExists: (item: string) => `${item} already exists`,

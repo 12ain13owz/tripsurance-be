@@ -1,10 +1,11 @@
 import type { NextFunction, RequestHandler, Response } from 'express'
 
 /**
- * Bridges a strongly typed handler (post-validate) onto Express's `RequestHandler`.
- * Zod transforms (e.g. string -> lowercased email) don't match Express's declared body/query
- * types, so route registration needs this adapter; controller signatures stay fully typed.
+ * Bridges a handler typed with a narrower/extended `Request` (e.g. post-validate body,
+ * or `req.user` guaranteed by an auth middleware) onto Express's structural `RequestHandler`.
+ * Express can't infer non-generic augmentations like `req.user`, so route registration
+ * needs this adapter; the handler's own signature stays fully typed.
  */
-export const asValidatedHandler = <TReq>(
-  handler: (req: TReq, res: Response, next: NextFunction) => Promise<void>
+export const asHandler = <TReq>(
+  handler: (req: TReq, res: Response, next: NextFunction) => Promise<void> | void
 ): RequestHandler => handler as unknown as RequestHandler

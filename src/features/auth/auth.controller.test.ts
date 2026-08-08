@@ -2,7 +2,7 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { AppError } from '@/core/error'
-import { ErrorSeverity, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import type { AppResponse } from '@/shared/types'
 import { AUTH_ERRORS, AUTH_MESSAGES } from './auth.const'
 import type { AuthSession, SafeUser } from './auth.type'
@@ -179,13 +179,13 @@ describe('POST /auth/refresh', () => {
     const body = res.body as AppResponse<undefined>
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
-    expect(body.message).toBe(AUTH_ERRORS.MISSING_TOKEN)
+    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
     expect(refreshMock).not.toHaveBeenCalled()
   })
 
   it('forwards a service AppError (e.g. a reused or invalid token) to the error handler', async () => {
     refreshMock.mockRejectedValue(
-      new AppError(AUTH_ERRORS.INVALID_TOKEN, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+      new AppError(ERRORS.AUTH.INVALID_TOKEN, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
     )
 
     const res = await request(app)
@@ -194,6 +194,6 @@ describe('POST /auth/refresh', () => {
     const body = res.body as AppResponse<undefined>
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
-    expect(body.message).toBe(AUTH_ERRORS.INVALID_TOKEN)
+    expect(body.message).toBe(ERRORS.AUTH.INVALID_TOKEN)
   })
 })

@@ -3,7 +3,7 @@ import { prisma } from '@/core/database/prisma'
 import { AppError, wrapUnexpected } from '@/core/error'
 import { hashToken, signAccessToken, signRefreshToken, verifyRefreshToken } from '@/core/security'
 import type { User } from '@/generated/prisma/client'
-import { ErrorSeverity, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
 import type { AuthSession, SafeUser } from './auth.type'
 
@@ -49,19 +49,19 @@ const toSafeUser = (user: User): SafeUser => {
   return safeUser
 }
 
-const findUserById = async (userId: string): Promise<User> => {
+const findUserById = async (userId: string, operation: string): Promise<User> => {
   const user = await wrapUnexpected(async () => prisma.user.findUnique({ where: { id: userId } }), {
-    operation: 'refresh',
+    operation: operation,
     metadata: { userId },
   })
 
   if (!user) {
-    throw invalidToken('refresh')
+    throw invalidToken(operation)
   }
 
   if (!user.isActive) {
     throw new AppError(AUTH_ERRORS.ACCOUNT_DISABLED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
-      .withOperation('refresh')
+      .withOperation(operation)
       .withMetadata({ userId })
   }
 
@@ -100,7 +100,7 @@ const revokeRefreshToken = async (refreshToken: string, operation: string): Prom
 
 const invalidToken = (operation: string): AppError =>
   new AppError(
-    AUTH_ERRORS.INVALID_TOKEN,
+    ERRORS.AUTH.INVALID_TOKEN,
     HttpStatus.UNAUTHORIZED,
     ErrorSeverity.WARN
   ).withOperation(operation)
@@ -144,7 +144,7 @@ export const refresh = async (refreshToken: string): Promise<AuthSession> => {
     throw invalidToken('refresh')
   }
 
-  const user = await findUserById(userId)
+  const user = await findUserById(userId, 'refresh')
   const newAccessToken = signAccessToken(userId)
   const newRefreshToken = signRefreshToken(userId)
   await persistRefreshToken(userId, newRefreshToken, 'refresh')
@@ -156,4 +156,9 @@ export const refresh = async (refreshToken: string): Promise<AuthSession> => {
   }
 
   return data
+}
+
+export const getProfile = async (userId: string) => {
+  const user = await findUserById(userId, 'getProfile')
+  return toSafeUser(user)
 }

@@ -1,11 +1,12 @@
 import { AppError } from '@/core/error'
+import type { AuthenticatedRequest } from '@/core/middlewares/authenticate'
 import { verifyRefreshToken } from '@/core/security'
-import { ErrorSeverity, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
-import { AUTH_ERRORS, AUTH_MESSAGES } from './auth.const'
+import { AUTH_MESSAGES } from './auth.const'
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './auth.cookie'
 import * as authService from './auth.service'
-import type { AuthReq, SignInData } from './auth.type'
+import type { AuthReq, SafeUser, SignInData } from './auth.type'
 import type { Request, Response, NextFunction } from 'express'
 
 export const signIn = async (
@@ -46,7 +47,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
     const currentToken = readRefreshCookie(req)
     if (!currentToken) {
       throw new AppError(
-        AUTH_ERRORS.MISSING_TOKEN,
+        ERRORS.AUTH.MISSING_TOKEN,
         HttpStatus.UNAUTHORIZED,
         ErrorSeverity.WARN
       ).withOperation('refresh')
@@ -62,5 +63,19 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
+  }
+}
+
+export const me = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  nexT: NextFunction
+): Promise<void> => {
+  try {
+    const data: SafeUser = await authService.getProfile(req.user.sub)
+    const response = createResponse(AUTH_MESSAGES.ME, data)
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    nexT(error)
   }
 }

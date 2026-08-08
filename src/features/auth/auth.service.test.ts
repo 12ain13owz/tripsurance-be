@@ -232,7 +232,7 @@ describe('refresh', () => {
     refreshTokenUpdateManyMock.mockResolvedValue({ count: 0 })
 
     await expect(refresh('old-refresh-token')).rejects.toMatchObject({
-      message: AUTH_ERRORS.INVALID_TOKEN,
+      message: ERRORS.AUTH.INVALID_TOKEN,
       status: HttpStatus.UNAUTHORIZED,
     })
     expect(findUnique).not.toHaveBeenCalled()
@@ -263,7 +263,7 @@ describe('refresh', () => {
     findUnique.mockResolvedValue(null)
 
     await expect(refresh('old-refresh-token')).rejects.toMatchObject({
-      message: AUTH_ERRORS.INVALID_TOKEN,
+      message: ERRORS.AUTH.INVALID_TOKEN,
       status: HttpStatus.UNAUTHORIZED,
     })
   })
