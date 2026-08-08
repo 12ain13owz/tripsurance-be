@@ -95,6 +95,24 @@ features  ->  shared
 - Prefix intentionally unused params with `_` (e.g. `_req`, `_next`).
 - Every Promise must be awaited or handled (`no-floating-promises`).
 
+#### `null` vs `undefined`
+
+- Prefer `null` for a value _we_ deliberately return to mean "intentionally absent" in our own
+  domain logic — e.g. a lookup that found nothing, matching how Prisma itself already returns
+  `null` for nullable columns and missing records (`User | null`).
+- Keep `undefined` for optional parameters/properties (`foo?: string`) — that's the language's own
+  idiom; don't fight it by requiring callers to pass `null` explicitly.
+- Keep `undefined` for values sourced from an external dependency/runtime API that already returns
+  `undefined` (`process.env.X`, `Array.prototype.find`, etc.) — don't convert at the boundary.
+- Keep `undefined` anywhere the logging or response layer treats it as a deliberate **elision**
+  sentinel — don't "fix" these. `extractMetadata` (`core/logger/logger.ts`) drops any metadata key
+  whose value is `undefined` but logs `null` values as-is, and `JSON.stringify` drops `undefined`
+  object fields but serializes `null` explicitly (see `error.middleware.ts`'s dev-only `data`
+  field). Swapping one of these to `null` isn't a no-op — a field that was cleanly omitted from a
+  log line or response body would start showing up as an explicit `null`. `core/logger/stack.ts`'s
+  `getCallerSource` is the concrete example: it looks like a "value we control, prefer null" case,
+  but it feeds straight into that elision path, so it stays `undefined`.
+
 ### Logging & env
 
 - Never use `console.*` for app logging — use the Winston `logger` from `@/core/logger` (`console.info`/`warn`/`error` are only tolerated inside `core/config/env/env.ts`, for bootstrap messages that run before the logger/env are ready).
