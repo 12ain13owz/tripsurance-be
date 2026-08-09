@@ -14,21 +14,21 @@ const SALT_ROUNDS = 10
 const SEED_PASSWORD = '!Qwer1234'
 const SEED_USERS: SeedUser[] = [
   {
-    email: 'tripsurance.admin@mailinator.com',
+    email: 'tripad@mailinator.com',
     firstName: 'Tripsurance',
     lastName: 'Admin',
     role: Role.ADMIN,
     isActive: true,
   },
   {
-    email: 'tripsurance.inactive@mailinator.com',
+    email: 'tripin@mailinator.com',
     firstName: 'Tripsurance',
     lastName: 'Admin',
     role: Role.ADMIN,
     isActive: false,
   },
   {
-    email: 'tripsurance.superadmin@mailinator.com',
+    email: 'tripsu@mailinator.com',
     firstName: 'Tripsurance',
     lastName: 'Super Admin',
     role: Role.SUPER_ADMIN,
