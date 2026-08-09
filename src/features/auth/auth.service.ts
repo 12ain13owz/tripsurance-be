@@ -276,3 +276,25 @@ export const resetPassword = async (token: string, newPassword: string): Promise
     })
   })
 }
+
+export const cleanupExpiredTokens = async (): Promise<{
+  refreshTokens: number
+  passwordResetTokens: number
+}> => {
+  const now = new Date()
+
+  const [refreshTokens, passwordResetTokens] = await wrapUnexpected(
+    async () =>
+      prisma.$transaction([
+        prisma.refreshToken.deleteMany({
+          where: { OR: [{ revokedAt: { not: null } }, { expiresAt: { lt: now } }] },
+        }),
+        prisma.passwordResetToken.deleteMany({
+          where: { OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }] },
+        }),
+      ]),
+    { operation: 'cleanupExpiredTokens' }
+  )
+
+  return { refreshTokens: refreshTokens.count, passwordResetTokens: passwordResetTokens.count }
+}
