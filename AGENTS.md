@@ -312,7 +312,7 @@ Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is con
 
 ### Typed `req` narrowing (`authenticate` + `AuthenticatedRequest`)
 
-`authenticate` (`core/middleware/authenticate.ts`) verifies the `Authorization: Bearer` access token and sets `req.user` to the decoded payload before calling `next()`; `req.user` is `AccessTokenPayload | undefined` globally (`core/types/express.d.ts`) since most routes aren't authenticated. For a route that *is* behind `authenticate`, don't re-check `req.user` for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead, type the controller's `req` param as `AuthenticatedRequest` (exported from `authenticate.ts`), which narrows `user` to always-present:
+`authenticate` (`core/middleware/authenticate.ts`) verifies the `Authorization: Bearer` access token and sets `req.user` to the decoded payload before calling `next()`; `req.user` is `AccessTokenPayload | undefined` globally (`core/types/express.d.ts`) since most routes aren't authenticated. For a route that _is_ behind `authenticate`, don't re-check `req.user` for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead, type the controller's `req` param as `AuthenticatedRequest` (exported from `authenticate.ts`), which narrows `user` to always-present:
 
 ```ts
 export const me = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {

@@ -6,8 +6,8 @@ dist/
 !.env.example
 
 /generated/prisma
-/.claude/skills/prisma-*
-/.agents/skills/prisma-*
+/.claude
+/.agents
 /.windsurf/
 skills-lock.json
 
