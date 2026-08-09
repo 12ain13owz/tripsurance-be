@@ -23,6 +23,10 @@ export default defineConfig({
       JWT_ACCESS_EXPIRES: '1d',
       JWT_REFRESH_SECRET: 'refresh-token-at-least-32-characters',
       JWT_REFRESH_EXPIRES: '7d',
+      EMAIL_FROM: 'Tripsurance <no-reply@tripsurance.com>',
+      RESEND_API_KEY: 're_test_00000000000000000000000000',
+      RESET_TOKEN_EXPIRES: '30m',
+      FRONTEND_URL: 'http://localhost:4000',
     },
   },
 })

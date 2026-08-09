@@ -15,6 +15,10 @@ const validEnv = {
   JWT_ACCESS_EXPIRES: '1d',
   JWT_REFRESH_SECRET: 'refresh-token-at-least-32-characters',
   JWT_REFRESH_EXPIRES: '7d',
+  EMAIL_FROM: 'Tripsurance <no-reply@tripsurance.com>',
+  RESEND_API_KEY: 're_test_00000000000000000000000000',
+  RESET_TOKEN_EXPIRES: '30m',
+  FRONTEND_URL: 'http://localhost:4000',
 }
 
 describe('envSchema', () => {
@@ -110,6 +114,21 @@ describe('envSchema', () => {
       ...validEnv,
       JWT_REFRESH_EXPIRES: 'not-a-valid-expiration',
     })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts a well-formed RESET_TOKEN_EXPIRES duration string', () => {
+    const result = envSchema.safeParse({ ...validEnv, RESET_TOKEN_EXPIRES: '15m' })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects a malformed RESET_TOKEN_EXPIRES duration string', () => {
+    const result = envSchema.safeParse({ ...validEnv, RESET_TOKEN_EXPIRES: '30minutes' })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a FRONTEND_URL that is not a valid url', () => {
+    const result = envSchema.safeParse({ ...validEnv, FRONTEND_URL: 'not-a-url' })
     expect(result.success).toBe(false)
   })
 })

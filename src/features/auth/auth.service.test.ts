@@ -1,9 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { env } from '@/core/config'
 import { AppError } from '@/core/error'
 import type { User } from '@/generated/prisma/client'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
-import { getProfile, refresh, signIn, signOut } from './auth.service'
+import {
+  changePassword,
+  cleanupExpiredTokens,
+  forgotPassword,
+  getProfile,
+  refresh,
+  resetPassword,
+  signIn,
+  signOut,
+} from './auth.service'
 
 const findUnique =
   vi.fn<(args: { where: { email: string } | { id: string } }) => Promise<User | null>>()
@@ -18,29 +28,75 @@ const refreshTokenCreateMock =
 const refreshTokenUpdateManyMock =
   vi.fn<
     (args: {
-      where: { tokenHash: string; revokedAt: null }
+      where: { tokenHash?: string; userId?: string; revokedAt: null }
       data: { revokedAt: Date }
     }) => Promise<{ count: number }>
   >()
+const hashMock = vi.fn<(password: string, saltRounds: number) => Promise<string>>()
+const userUpdateMock =
+  vi.fn<(args: { where: { id: string }; data: { password: string } }) => Promise<unknown>>()
+const passwordResetTokenCreateMock =
+  vi.fn<
+    (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) => Promise<unknown>
+  >()
+const passwordResetTokenFindUniqueMock =
+  vi.fn<(args: { where: { tokenHash: string } }) => Promise<unknown>>()
+const passwordResetTokenUpdateMock =
+  vi.fn<(args: { where: { tokenHash: string }; data: { usedAt: Date } }) => Promise<unknown>>()
+const refreshTokenDeleteManyMock = vi.fn<() => Promise<{ count: number }>>()
+const passwordResetTokenDeleteManyMock = vi.fn<() => Promise<{ count: number }>>()
+const sendMailMock = vi.fn<(args: { to: string; subject: string; html: string }) => Promise<void>>()
+const passwordResetEmailMock = vi.fn<
+  (args: { resetUrl: string; token: string; expiresInMinutes: number }) => {
+    subject: string
+    html: string
+  }
+>()
+
+const txClient = {
+  user: { update: userUpdateMock },
+  passwordResetToken: { update: passwordResetTokenUpdateMock },
+  refreshToken: { updateMany: refreshTokenUpdateManyMock },
+}
+const transactionMock = vi.fn(async (arg: unknown) => {
+  if (typeof arg === 'function') {
+    return (arg as (tx: typeof txClient) => Promise<unknown>)(txClient)
+  }
+  return Promise.all(arg as Promise<unknown>[])
+})
 
 vi.mock('@/core/database/prisma', () => ({
   prisma: {
     user: {
       findUnique: async (args: { where: { email: string } | { id: string } }) => findUnique(args),
+      update: async (args: { where: { id: string }; data: { password: string } }) =>
+        userUpdateMock(args),
     },
     refreshToken: {
       create: async (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) =>
         refreshTokenCreateMock(args),
       updateMany: async (args: {
-        where: { tokenHash: string; revokedAt: null }
+        where: { tokenHash?: string; userId?: string; revokedAt: null }
         data: { revokedAt: Date }
       }) => refreshTokenUpdateManyMock(args),
+      deleteMany: async () => refreshTokenDeleteManyMock(),
     },
+    passwordResetToken: {
+      create: async (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) =>
+        passwordResetTokenCreateMock(args),
+      findUnique: async (args: { where: { tokenHash: string } }) =>
+        passwordResetTokenFindUniqueMock(args),
+      update: async (args: { where: { tokenHash: string }; data: { usedAt: Date } }) =>
+        passwordResetTokenUpdateMock(args),
+      deleteMany: async () => passwordResetTokenDeleteManyMock(),
+    },
+    $transaction: async (arg: unknown) => transactionMock(arg),
   },
 }))
 
 vi.mock('bcryptjs', () => ({
   compare: async (password: string, hash: string) => compareMock(password, hash),
+  hash: async (password: string, saltRounds: number) => hashMock(password, saltRounds),
   hashSync: () => 'dummy-hash',
 }))
 
@@ -49,6 +105,15 @@ vi.mock('@/core/security', () => ({
   signRefreshToken: (sub: string) => signRefreshTokenMock(sub),
   verifyRefreshToken: (token: string) => verifyRefreshTokenMock(token),
   hashToken: (token: string) => `hashed-${token}`,
+}))
+
+vi.mock('@/core/mailer', () => ({
+  sendMail: async (args: { to: string; subject: string; html: string }) => sendMailMock(args),
+}))
+
+vi.mock('@/core/mailer/templates', () => ({
+  passwordResetEmail: (args: { resetUrl: string; token: string; expiresInMinutes: number }) =>
+    passwordResetEmailMock(args),
 }))
 
 const activeUser: User = {
@@ -75,6 +140,18 @@ beforeEach(() => {
   verifyRefreshTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
   refreshTokenCreateMock.mockReset().mockResolvedValue(undefined)
   refreshTokenUpdateManyMock.mockReset().mockResolvedValue({ count: 1 })
+  hashMock.mockReset().mockResolvedValue('hashed-new-password')
+  userUpdateMock.mockReset().mockResolvedValue(undefined)
+  passwordResetTokenCreateMock.mockReset().mockResolvedValue(undefined)
+  passwordResetTokenFindUniqueMock.mockReset()
+  passwordResetTokenUpdateMock.mockReset().mockResolvedValue(undefined)
+  refreshTokenDeleteManyMock.mockReset().mockResolvedValue({ count: 0 })
+  passwordResetTokenDeleteManyMock.mockReset().mockResolvedValue({ count: 0 })
+  sendMailMock.mockReset().mockResolvedValue(undefined)
+  passwordResetEmailMock
+    .mockReset()
+    .mockReturnValue({ subject: 'Reset your password', html: '<html/>' })
+  transactionMock.mockClear()
 })
 
 describe('signIn', () => {
@@ -306,6 +383,183 @@ describe('getProfile', () => {
     await expect(getProfile('user-1')).rejects.toMatchObject({
       message: AUTH_ERRORS.ACCOUNT_DISABLED,
       status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+})
+
+describe('changePassword', () => {
+  it('hashes and saves the new password when the current password matches', async () => {
+    findUnique.mockResolvedValue(activeUser)
+    compareMock.mockResolvedValue(true)
+
+    await changePassword('user-1', 'correct-current', 'NewStrong1!')
+
+    expect(compareMock).toHaveBeenCalledWith('correct-current', activeUser.password)
+    expect(hashMock).toHaveBeenCalledWith('NewStrong1!', 10)
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { password: 'hashed-new-password' },
+    })
+  })
+
+  it('throws INVALID_CURRENT_PASSWORD and does not touch the DB when the current password is wrong', async () => {
+    findUnique.mockResolvedValue(activeUser)
+    compareMock.mockResolvedValue(false)
+
+    await expect(changePassword('user-1', 'wrong-current', 'NewStrong1!')).rejects.toMatchObject({
+      message: AUTH_ERRORS.INVALID_CURRENT_PASSWORD,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+    expect(userUpdateMock).not.toHaveBeenCalled()
+  })
+
+  it('throws INVALID_TOKEN when the user id no longer matches an existing user', async () => {
+    findUnique.mockResolvedValue(null)
+
+    await expect(changePassword('deleted-user', 'x', 'NewStrong1!')).rejects.toMatchObject({
+      message: ERRORS.AUTH.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+
+  it('throws ACCOUNT_DISABLED when the user has been deactivated', async () => {
+    findUnique.mockResolvedValue({ ...activeUser, isActive: false })
+
+    await expect(changePassword('user-1', 'x', 'NewStrong1!')).rejects.toMatchObject({
+      message: AUTH_ERRORS.ACCOUNT_DISABLED,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+})
+
+describe('forgotPassword', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('creates a hashed reset token and emails the user when the email matches an account', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+    findUnique.mockResolvedValue(activeUser)
+
+    await forgotPassword('jane@example.com')
+
+    expect(passwordResetTokenCreateMock).toHaveBeenCalledTimes(1)
+    const createArgs = passwordResetTokenCreateMock.mock.calls[0][0]
+    const emailArgs = passwordResetEmailMock.mock.calls[0][0]
+
+    expect(createArgs.data.userId).toBe('user-1')
+    expect(createArgs.data.tokenHash).toBe(`hashed-${emailArgs.token}`)
+    expect(createArgs.data.expiresAt).toEqual(new Date('2026-08-08T10:30:00.000Z'))
+    expect(emailArgs.resetUrl).toBe(`${env.FRONTEND_URL}/reset-password?token=${emailArgs.token}`)
+    expect(emailArgs.expiresInMinutes).toBe(30)
+    expect(sendMailMock).toHaveBeenCalledWith({
+      to: 'jane@example.com',
+      subject: 'Reset your password',
+      html: '<html/>',
+    })
+  })
+
+  it('does nothing but still resolves when no account matches the email (anti-enumeration)', async () => {
+    vi.useFakeTimers()
+    findUnique.mockResolvedValue(null)
+
+    const pending = forgotPassword('missing@example.com')
+    await vi.advanceTimersByTimeAsync(400)
+    await expect(pending).resolves.toBeUndefined()
+
+    expect(passwordResetTokenCreateMock).not.toHaveBeenCalled()
+    expect(sendMailMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('resetPassword', () => {
+  const resetToken = {
+    id: 'reset-1',
+    userId: 'user-1',
+    tokenHash: 'hashed-raw-token',
+    expiresAt: new Date('2026-08-08T11:00:00.000Z'),
+    usedAt: null as Date | null,
+    createdAt: new Date('2026-08-08T10:00:00.000Z'),
+    user: activeUser,
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('throws INVALID_TOKEN when no reset token matches the hash', async () => {
+    passwordResetTokenFindUniqueMock.mockResolvedValue(null)
+
+    await expect(resetPassword('raw-token', 'NewStrong1!')).rejects.toMatchObject({
+      message: ERRORS.AUTH.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+  })
+
+  it('throws INVALID_TOKEN when the token has already been used (single-use enforcement)', async () => {
+    passwordResetTokenFindUniqueMock.mockResolvedValue({
+      ...resetToken,
+      usedAt: new Date('2026-08-08T10:05:00.000Z'),
+    })
+
+    await expect(resetPassword('raw-token', 'NewStrong1!')).rejects.toMatchObject({
+      message: ERRORS.AUTH.INVALID_TOKEN,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+    expect(userUpdateMock).not.toHaveBeenCalled()
+  })
+
+  it('throws RESET_TOKEN_EXPIRED and does not touch the DB when the token has expired', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T12:00:00.000Z'))
+    passwordResetTokenFindUniqueMock.mockResolvedValue(resetToken)
+
+    await expect(resetPassword('raw-token', 'NewStrong1!')).rejects.toMatchObject({
+      message: AUTH_ERRORS.RESET_TOKEN_EXPIRED,
+      status: HttpStatus.UNAUTHORIZED,
+    })
+    expect(userUpdateMock).not.toHaveBeenCalled()
+  })
+
+  it('updates the password, marks the token used, and revokes every refresh token on success', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:30:00.000Z'))
+    passwordResetTokenFindUniqueMock.mockResolvedValue(resetToken)
+
+    await resetPassword('raw-token', 'NewStrong1!')
+
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { password: 'hashed-new-password' },
+    })
+    expect(passwordResetTokenUpdateMock).toHaveBeenCalledWith({
+      where: { tokenHash: 'hashed-raw-token' },
+      data: { usedAt: new Date('2026-08-08T10:30:00.000Z') },
+    })
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null },
+      data: { revokedAt: new Date('2026-08-08T10:30:00.000Z') },
+    })
+  })
+})
+
+describe('cleanupExpiredTokens', () => {
+  it('deletes expired/revoked refresh tokens and expired/used reset tokens, returning counts', async () => {
+    refreshTokenDeleteManyMock.mockResolvedValue({ count: 3 })
+    passwordResetTokenDeleteManyMock.mockResolvedValue({ count: 2 })
+
+    const result = await cleanupExpiredTokens()
+
+    expect(result).toEqual({ refreshTokens: 3, passwordResetTokens: 2 })
+  })
+
+  it('wraps an unexpected DB failure into a generic AppError instead of leaking it', async () => {
+    refreshTokenDeleteManyMock.mockRejectedValue(new Error('connection refused'))
+
+    await expect(cleanupExpiredTokens()).rejects.toMatchObject({
+      message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
     })
   })
 })
