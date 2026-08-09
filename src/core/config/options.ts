@@ -28,3 +28,12 @@ export const rateLimitOptions: Partial<RateLimitOptions> = {
   standardHeaders: true,
   legacyHeaders: false,
 }
+
+export const passwordResetLimitOptions: Partial<RateLimitOptions> = {
+  windowMs: 15 * 60 * 1000,
+  max: env.NODE_ENV === AppEnv.PRODUCTION ? 5 : 100,
+  message: ERRORS.GENERIC.TOO_MANY_REQUESTS,
+  statusCode: HttpStatus.TOO_MANY_REQUESTS,
+  standardHeaders: true,
+  legacyHeaders: false,
+}
