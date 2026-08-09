@@ -6,7 +6,7 @@ import type { Request, Response, NextFunction } from 'express'
 
 const BEARER_PREFIX = 'Bearer '
 
-export type AuthenticatedRequest = Request & { user: AccessTokenPayload }
+export type AuthenticatedRequest<TReq = Request> = TReq & { user: AccessTokenPayload }
 
 export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
   try {

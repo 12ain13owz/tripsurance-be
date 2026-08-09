@@ -16,4 +16,8 @@ export type EnvConfig = {
   JWT_ACCESS_EXPIRES: string
   JWT_REFRESH_SECRET: string
   JWT_REFRESH_EXPIRES: string
+  EMAIL_FROM: string
+  RESEND_API_KEY: string
+  RESET_TOKEN_EXPIRES: string
+  FRONTEND_URL: string
 }

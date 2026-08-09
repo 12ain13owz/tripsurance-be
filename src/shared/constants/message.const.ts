@@ -41,6 +41,9 @@ export const ERRORS = {
     MISSING_TOKEN: 'Authentication required',
     INVALID_TOKEN: 'Invalid or expired token',
   },
+  MAIL: {
+    SEND_FAILED: 'Failed to send email. Please try again later',
+  },
   UTIL: {
     notFound: (item: string) => `${item} not found`,
     alreadyExists: (item: string) => `${item} already exists`,
@@ -49,5 +52,6 @@ export const ERRORS = {
     requiredField: (field: string) => `${field} is required`,
     minLength: (field: string, length: number) => `${field} must be at least ${length} characters`,
     failedAction: (action?: string, target?: string) => `Failed to ${action} ${target}`,
+    weakPassword: (field: string) => `${field} is too weak`,
   },
 }

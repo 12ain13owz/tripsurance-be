@@ -30,4 +30,8 @@ export const envSchema: z.ZodType<EnvConfig> = z.object({
   JWT_ACCESS_EXPIRES: z.string().regex(durationString),
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_REFRESH_EXPIRES: z.string().regex(durationString),
+  EMAIL_FROM: z.string(),
+  RESEND_API_KEY: z.string(),
+  RESET_TOKEN_EXPIRES: z.string().regex(durationString),
+  FRONTEND_URL: z.url(),
 })

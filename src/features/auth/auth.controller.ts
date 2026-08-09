@@ -6,7 +6,7 @@ import { createResponse } from '@/shared/utils'
 import { AUTH_MESSAGES } from './auth.const'
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './auth.cookie'
 import * as authService from './auth.service'
-import type { AuthReq, SafeUser, SignInData } from './auth.type'
+import type { AuthReq, ProtectedAuthReq, SafeUser, SignInData } from './auth.type'
 import type { Request, Response, NextFunction } from 'express'
 
 export const signIn = async (
@@ -23,6 +23,7 @@ export const signIn = async (
 
     const data: SignInData = session
     const response = createResponse(AUTH_MESSAGES.SIGN_IN, data)
+
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
@@ -36,6 +37,7 @@ export const signOut = async (req: Request, res: Response, next: NextFunction): 
 
     clearRefreshCookie(res)
     const response = createResponse(AUTH_MESSAGES.SIGN_OUT)
+
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
@@ -60,6 +62,7 @@ export const refresh = async (req: Request, res: Response, next: NextFunction): 
 
     const data: SignInData = session
     const response = createResponse(AUTH_MESSAGES.REFRESH, data)
+
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
@@ -72,10 +75,64 @@ export const me = async (
   nexT: NextFunction
 ): Promise<void> => {
   try {
-    const data: SafeUser = await authService.getProfile(req.user.sub)
+    const userId = req.user.sub
+    const data: SafeUser = await authService.getProfile(userId)
     const response = createResponse(AUTH_MESSAGES.ME, data)
+
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
     nexT(error)
+  }
+}
+
+export const changePassword = async (
+  req: ProtectedAuthReq<'changePassword'>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user.sub
+    const { currentPassword, newPassword } = req.body
+    await authService.changePassword(userId, currentPassword, newPassword)
+
+    const response = createResponse(AUTH_MESSAGES.CHANGE_PASSWORD)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const forgotPassword = async (
+  req: AuthReq<'forgotPassword'>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { email } = req.body
+    await authService.forgotPassword(email)
+
+    const response = createResponse(AUTH_MESSAGES.FORGOT_PASSWORD)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const resetPassword = async (
+  req: AuthReq<'resetPassword'>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { token, newPassword } = req.body
+    await authService.resetPassword(token, newPassword)
+
+    const response = createResponse(AUTH_MESSAGES.RESET_PASSWORD)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
   }
 }
