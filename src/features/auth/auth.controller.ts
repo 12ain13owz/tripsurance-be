@@ -93,7 +93,8 @@ export const changePassword = async (
   try {
     const userId = req.user.sub
     const { currentPassword, newPassword } = req.body
-    await authService.changePassword(userId, currentPassword, newPassword)
+    const currentToken = readRefreshCookie(req)
+    await authService.changePassword(userId, currentPassword, newPassword, currentToken)
 
     const response = createResponse(AUTH_MESSAGES.CHANGE_PASSWORD)
 
@@ -127,9 +128,13 @@ export const resetPassword = async (
 ): Promise<void> => {
   try {
     const { token, newPassword } = req.body
-    await authService.resetPassword(token, newPassword)
+    const { refreshToken, ...session } = await authService.resetPassword(token, newPassword)
+    const { exp } = verifyRefreshToken(refreshToken)
 
-    const response = createResponse(AUTH_MESSAGES.RESET_PASSWORD)
+    setRefreshCookie(res, refreshToken, exp)
+
+    const data: SignInData = session
+    const response = createResponse(AUTH_MESSAGES.RESET_PASSWORD, data)
 
     res.status(HttpStatus.OK).json(response)
   } catch (error) {

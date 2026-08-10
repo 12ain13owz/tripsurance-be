@@ -178,14 +178,35 @@ export const getProfile = async (userId: string): Promise<SafeUser> => {
   return toSafeUser(user)
 }
 
+export const revokeOtherSessions = async (
+  userId: string,
+  currentToken: string | null
+): Promise<void> => {
+  const currentTokenHash = currentToken ? hashToken(currentToken) : null
+
+  await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.updateMany({
+        where: {
+          userId,
+          revokedAt: null,
+          ...(currentTokenHash ? { tokenHash: { not: currentTokenHash } } : {}),
+        },
+        data: { revokedAt: new Date() },
+      }),
+    { operation: 'revokeOtherSessions', metadata: { userId } }
+  )
+}
+
 export const changePassword = async (
   userId: string,
   currentPassword: string,
-  newPassword: string
-) => {
+  newPassword: string,
+  currentToken: string | null
+): Promise<void> => {
   const user = await findUserById(userId, 'changePassword')
-
   const passwordMatch = await compare(currentPassword, user.password)
+
   if (!passwordMatch) {
     throw new AppError(
       AUTH_ERRORS.INVALID_CURRENT_PASSWORD,
@@ -198,6 +219,7 @@ export const changePassword = async (
 
   const passwordHash = await hash(newPassword, SALT_ROUNDS)
   await prisma.user.update({ where: { id: user.id }, data: { password: passwordHash } })
+  await revokeOtherSessions(userId, currentToken)
 }
 
 export const forgotPassword = async (email: string) => {
@@ -230,7 +252,7 @@ export const forgotPassword = async (email: string) => {
   await sendMail({ to: user.email, subject, html })
 }
 
-export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+export const resetPassword = async (token: string, newPassword: string): Promise<AuthSession> => {
   const tokenHash = hashToken(token)
   const passwordResetToken = await wrapUnexpected(
     async () =>
@@ -275,6 +297,13 @@ export const resetPassword = async (token: string, newPassword: string): Promise
       data: { revokedAt: new Date() },
     })
   })
+
+  const accessToken = signAccessToken(user.id)
+  const refreshToken = signRefreshToken(user.id)
+  await persistRefreshToken(user.id, refreshToken, 'resetPassword')
+
+  const data: AuthSession = { user: toSafeUser(user), accessToken, refreshToken }
+  return data
 }
 
 export const cleanupExpiredTokens = async (): Promise<{
