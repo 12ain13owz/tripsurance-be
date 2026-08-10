@@ -10,7 +10,7 @@ import type { User } from '@/generated/prisma/client'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { parseDuration } from '@/shared/utils'
 import { AUTH_ERRORS } from './auth.const'
-import type { AuthSession, SafeUser } from './auth.type'
+import type { AuthSession, SafeUser, SessionSummary } from './auth.type'
 
 const SALT_ROUNDS = 10
 const DUMMY_HASH = hashSync('timing-attack', SALT_ROUNDS)
@@ -113,6 +113,26 @@ const revokeRefreshToken = async (refreshToken: string, operation: string): Prom
   return count > 0
 }
 
+const revokeOtherRefreshTokens = async (
+  userId: string,
+  currentToken: string | null,
+  operation: string
+): Promise<void> => {
+  const currentTokenHash = currentToken ? hashToken(currentToken) : null
+  await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.updateMany({
+        where: {
+          userId,
+          revokedAt: null,
+          ...(currentTokenHash ? { tokenHash: { not: currentTokenHash } } : {}),
+        },
+        data: { revokedAt: new Date() },
+      }),
+    { operation, metadata: { userId } }
+  )
+}
+
 const invalidToken = (operation: string): AppError =>
   new AppError(
     ERRORS.AUTH.INVALID_TOKEN,
@@ -178,26 +198,6 @@ export const getProfile = async (userId: string): Promise<SafeUser> => {
   return toSafeUser(user)
 }
 
-export const revokeOtherSessions = async (
-  userId: string,
-  currentToken: string | null
-): Promise<void> => {
-  const currentTokenHash = currentToken ? hashToken(currentToken) : null
-
-  await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.updateMany({
-        where: {
-          userId,
-          revokedAt: null,
-          ...(currentTokenHash ? { tokenHash: { not: currentTokenHash } } : {}),
-        },
-        data: { revokedAt: new Date() },
-      }),
-    { operation: 'revokeOtherSessions', metadata: { userId } }
-  )
-}
-
 export const changePassword = async (
   userId: string,
   currentPassword: string,
@@ -219,7 +219,7 @@ export const changePassword = async (
 
   const passwordHash = await hash(newPassword, SALT_ROUNDS)
   await prisma.user.update({ where: { id: user.id }, data: { password: passwordHash } })
-  await revokeOtherSessions(userId, currentToken)
+  await revokeOtherRefreshTokens(userId, currentToken, 'changePassword')
 }
 
 export const forgotPassword = async (email: string) => {
@@ -304,6 +304,55 @@ export const resetPassword = async (token: string, newPassword: string): Promise
 
   const data: AuthSession = { user: toSafeUser(user), accessToken, refreshToken }
   return data
+}
+
+export const listSessions = async (
+  userId: string,
+  currentToken: string | null
+): Promise<SessionSummary[]> => {
+  const currentTokenHash = currentToken ? hashToken(currentToken) : null
+
+  const sessions = await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.findMany({
+        where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    { operation: 'listSessions', metadata: { userId } }
+  )
+
+  const data: SessionSummary[] = sessions.map((session) => ({
+    id: session.id,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+    isCurrent: session.tokenHash === currentTokenHash,
+  }))
+
+  return data
+}
+
+export const revokeSession = async (userId: string, sessionId: string): Promise<void> => {
+  const { count } = await wrapUnexpected(
+    async () =>
+      prisma.refreshToken.updateMany({
+        where: { id: sessionId, userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    { operation: 'revokeSession', metadata: { userId, sessionId } }
+  )
+
+  if (count === 0) {
+    throw new AppError(AUTH_ERRORS.SESSION_NOT_FOUND, HttpStatus.NOT_FOUND, ErrorSeverity.WARN)
+      .withOperation('revokeSession')
+      .withMetadata({ userId, sessionId })
+  }
+}
+
+export const revokeOtherSessions = async (
+  userId: string,
+  currentToken: string | null
+): Promise<void> => {
+  await revokeOtherRefreshTokens(userId, currentToken, 'revokeOtherSessions')
 }
 
 export const cleanupExpiredTokens = async (): Promise<{

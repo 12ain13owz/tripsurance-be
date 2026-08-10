@@ -32,5 +32,13 @@ router.post(
   validate(authSchema.resetPassword.body),
   authController.resetPassword
 )
+router.get('/sessions', authenticate, asHandler(authController.listSessions))
+router.delete(
+  '/sessions/:id',
+  authenticate,
+  validate(authSchema.revokeSession.params, 'params'),
+  asHandler(authController.revokeSession)
+)
+router.delete('/sessions', authenticate, asHandler(authController.revokeOtherSessions))
 
 export const authRouter = router

@@ -14,3 +14,10 @@ export interface AuthSession {
 }
 
 export type SignInData = Omit<AuthSession, 'refreshToken'>
+
+export interface SessionSummary {
+  id: string
+  createdAt: Date
+  expiresAt: Date
+  isCurrent: boolean
+}

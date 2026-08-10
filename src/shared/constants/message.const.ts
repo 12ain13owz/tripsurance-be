@@ -15,6 +15,7 @@ export const SUCCESS = {
     DELETED: 'Data deleted successfully',
   },
   UTIL: {
+    list: (name: string) => `Listed ${name} successfully`,
     create: (name: string) => `Created ${name} successfully`,
     update: (name: string) => `Updated ${name} successfully`,
     delete: (name: string) => `Deleted ${name} successfully`,

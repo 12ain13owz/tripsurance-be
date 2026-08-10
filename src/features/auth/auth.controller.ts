@@ -1,12 +1,12 @@
 import { AppError } from '@/core/error'
 import type { AuthenticatedRequest } from '@/core/middleware/authenticate'
 import { verifyRefreshToken } from '@/core/security'
-import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus, SUCCESS } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
 import { AUTH_MESSAGES } from './auth.const'
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './auth.cookie'
 import * as authService from './auth.service'
-import type { AuthReq, ProtectedAuthReq, SafeUser, SignInData } from './auth.type'
+import type { AuthReq, ProtectedAuthReq, SafeUser, SessionSummary, SignInData } from './auth.type'
 import type { Request, Response, NextFunction } from 'express'
 
 export const signIn = async (
@@ -75,7 +75,7 @@ export const me = async (
   nexT: NextFunction
 ): Promise<void> => {
   try {
-    const userId = req.user.sub
+    const { sub: userId } = req.user
     const data: SafeUser = await authService.getProfile(userId)
     const response = createResponse(AUTH_MESSAGES.ME, data)
 
@@ -91,7 +91,7 @@ export const changePassword = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const userId = req.user.sub
+    const { sub: userId } = req.user
     const { currentPassword, newPassword } = req.body
     const currentToken = readRefreshCookie(req)
     await authService.changePassword(userId, currentPassword, newPassword, currentToken)
@@ -135,6 +135,59 @@ export const resetPassword = async (
 
     const data: SignInData = session
     const response = createResponse(AUTH_MESSAGES.RESET_PASSWORD, data)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const listSessions = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { sub: userId } = req.user
+    const currentToken = readRefreshCookie(req)
+    const data: SessionSummary[] = await authService.listSessions(userId, currentToken)
+    const response = createResponse(SUCCESS.UTIL.list('sessions'), data)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const revokeSession = async (
+  req: ProtectedAuthReq<'revokeSession'>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { sub: userId } = req.user
+    const { id } = req.params
+
+    await authService.revokeSession(userId, id)
+    const response = createResponse(AUTH_MESSAGES.REVOKE_SESSION)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const revokeOtherSessions = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user.sub
+    const currentToken = readRefreshCookie(req)
+
+    await authService.revokeOtherSessions(userId, currentToken)
+    const response = createResponse(AUTH_MESSAGES.REVOKE_OTHER_SESSIONS)
 
     res.status(HttpStatus.OK).json(response)
   } catch (error) {

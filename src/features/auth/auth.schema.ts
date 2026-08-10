@@ -3,6 +3,7 @@ import { ERRORS } from '@/shared/constants'
 import { AUTH_ERRORS } from './auth.const'
 
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/
+const CUID_REGEX = /^[cC][0-9a-z]{6,}$/
 
 const emailField = z
   .string({ error: ERRORS.UTIL.requiredField('Email') })
@@ -56,17 +57,16 @@ const resetPasswordSchema = z
     path: ['confirmPassword'],
   })
 
+const revokeSessionSchema = z.object({
+  id: z
+    .string({ error: ERRORS.UTIL.requiredField('Session id') })
+    .regex(CUID_REGEX, ERRORS.UTIL.invalidField('session id')),
+})
+
 export const authSchema = {
-  signIn: {
-    body: signInSchema,
-  },
-  changePassword: {
-    body: changePasswordSchema,
-  },
-  forgotPassword: {
-    body: forgotPasswordSchema,
-  },
-  resetPassword: {
-    body: resetPasswordSchema,
-  },
+  signIn: { body: signInSchema },
+  changePassword: { body: changePasswordSchema },
+  forgotPassword: { body: forgotPasswordSchema },
+  resetPassword: { body: resetPasswordSchema },
+  revokeSession: { params: revokeSessionSchema },
 } as const
