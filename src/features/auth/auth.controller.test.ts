@@ -2,10 +2,10 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import { AppError } from '@/core/error'
-import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus, SUCCESS } from '@/shared/constants'
 import type { AppResponse } from '@/shared/types'
 import { AUTH_ERRORS, AUTH_MESSAGES } from './auth.const'
-import type { AuthSession, SafeUser } from './auth.type'
+import type { AuthSession, SafeUser, SessionSummary } from './auth.type'
 
 const signInMock = vi.fn<(email: string, password: string) => Promise<AuthSession>>()
 const signOutMock = vi.fn<(refreshToken: string | null) => Promise<void>>()
@@ -22,6 +22,11 @@ const changePasswordMock =
   >()
 const forgotPasswordMock = vi.fn<(email: string) => Promise<void>>()
 const resetPasswordMock = vi.fn<(token: string, newPassword: string) => Promise<AuthSession>>()
+const listSessionsMock =
+  vi.fn<(userId: string, currentToken: string | null) => Promise<SessionSummary[]>>()
+const revokeSessionMock = vi.fn<(userId: string, sessionId: string) => Promise<void>>()
+const revokeOtherSessionsMock =
+  vi.fn<(userId: string, currentToken: string | null) => Promise<void>>()
 const verifyRefreshToken = vi.fn(() => ({ sub: 'user-1', exp: 1893456000 }))
 const verifyAccessTokenMock = vi.fn<(token: string) => { sub: string; iat: number; exp: number }>()
 
@@ -39,6 +44,11 @@ vi.mock('./auth.service', () => ({
   forgotPassword: async (email: string) => forgotPasswordMock(email),
   resetPassword: async (token: string, newPassword: string) =>
     resetPasswordMock(token, newPassword),
+  listSessions: async (userId: string, currentToken: string | null) =>
+    listSessionsMock(userId, currentToken),
+  revokeSession: async (userId: string, sessionId: string) => revokeSessionMock(userId, sessionId),
+  revokeOtherSessions: async (userId: string, currentToken: string | null) =>
+    revokeOtherSessionsMock(userId, currentToken),
 }))
 
 vi.mock('@/core/security', () => ({
@@ -75,6 +85,9 @@ beforeEach(() => {
   changePasswordMock.mockReset()
   forgotPasswordMock.mockReset()
   resetPasswordMock.mockReset()
+  listSessionsMock.mockReset()
+  revokeSessionMock.mockReset()
+  revokeOtherSessionsMock.mockReset()
   verifyRefreshToken.mockClear()
   verifyAccessTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
 })
@@ -440,5 +453,190 @@ describe('POST /auth/reset-password', () => {
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
     expect(body.message).toBe(ERRORS.AUTH.INVALID_TOKEN)
+  })
+})
+
+describe('GET /auth/sessions', () => {
+  const sessions: SessionSummary[] = [
+    {
+      id: 'session-1',
+      createdAt: new Date('2026-08-08T09:00:00.000Z'),
+      expiresAt: new Date('2026-08-09T09:00:00.000Z'),
+      isCurrent: true,
+    },
+    {
+      id: 'session-2',
+      createdAt: new Date('2026-08-07T09:00:00.000Z'),
+      expiresAt: new Date('2026-08-10T09:00:00.000Z'),
+      isCurrent: false,
+    },
+  ]
+
+  it('returns 200 with the session list for a valid bearer token', async () => {
+    listSessionsMock.mockResolvedValue(sessions)
+
+    const res = await request(app).get('/auth/sessions').set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<SessionSummary[]>
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(SUCCESS.UTIL.list('sessions'))
+    expect(body.data).toEqual([
+      {
+        ...sessions[0],
+        createdAt: sessions[0].createdAt.toISOString(),
+        expiresAt: sessions[0].expiresAt.toISOString(),
+      },
+      {
+        ...sessions[1],
+        createdAt: sessions[1].createdAt.toISOString(),
+        expiresAt: sessions[1].expiresAt.toISOString(),
+      },
+    ])
+  })
+
+  it('passes the bearer user id and the refreshToken cookie value through to the service', async () => {
+    listSessionsMock.mockResolvedValue(sessions)
+
+    await request(app)
+      .get('/auth/sessions')
+      .set('Authorization', 'Bearer access-token')
+      .set('Cookie', 'refreshToken=current-refresh-token')
+
+    expect(listSessionsMock).toHaveBeenCalledWith('user-1', 'current-refresh-token')
+  })
+
+  it('calls the service with null when there is no refreshToken cookie', async () => {
+    listSessionsMock.mockResolvedValue(sessions)
+
+    await request(app).get('/auth/sessions').set('Authorization', 'Bearer access-token')
+
+    expect(listSessionsMock).toHaveBeenCalledWith('user-1', null)
+  })
+
+  it('returns 401 MISSING_TOKEN and never calls the service when there is no Authorization header', async () => {
+    const res = await request(app).get('/auth/sessions')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
+    expect(listSessionsMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards a service AppError to the error handler', async () => {
+    listSessionsMock.mockRejectedValue(
+      new AppError(
+        ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        ErrorSeverity.ERROR
+      )
+    )
+
+    const res = await request(app).get('/auth/sessions').set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(body.message).toBe(ERRORS.GENERIC.INTERNAL_SERVER_ERROR)
+  })
+})
+
+describe('DELETE /auth/sessions/:id', () => {
+  const validId = 'cjld2cjxh0000qzrmn831i7rn'
+
+  it('returns 200 with the revoke-session message and calls the service with the bearer user id and session id', async () => {
+    revokeSessionMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .delete(`/auth/sessions/${validId}`)
+      .set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(AUTH_MESSAGES.REVOKE_SESSION)
+    expect(revokeSessionMock).toHaveBeenCalledWith('user-1', validId)
+  })
+
+  it('returns 401 MISSING_TOKEN and never calls the service when there is no Authorization header', async () => {
+    const res = await request(app).delete(`/auth/sessions/${validId}`)
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
+    expect(revokeSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 422 and never calls the service when the id is not a valid session id', async () => {
+    const res = await request(app)
+      .delete('/auth/sessions/not-a-cuid')
+      .set('Authorization', 'Bearer access-token')
+
+    expect(res.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY)
+    expect(revokeSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards a service AppError (e.g. session not found or owned by another user) to the error handler', async () => {
+    revokeSessionMock.mockRejectedValue(
+      new AppError(AUTH_ERRORS.SESSION_NOT_FOUND, HttpStatus.NOT_FOUND, ErrorSeverity.WARN)
+    )
+
+    const res = await request(app)
+      .delete(`/auth/sessions/${validId}`)
+      .set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.NOT_FOUND)
+    expect(body.message).toBe(AUTH_ERRORS.SESSION_NOT_FOUND)
+  })
+})
+
+describe('DELETE /auth/sessions', () => {
+  it('returns 200 with the revoke-other-sessions message and calls the service with the bearer user id', async () => {
+    revokeOtherSessionsMock.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .delete('/auth/sessions')
+      .set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(AUTH_MESSAGES.REVOKE_OTHER_SESSIONS)
+    expect(revokeOtherSessionsMock).toHaveBeenCalledWith('user-1', null)
+  })
+
+  it('passes the refreshToken cookie value through to the service as currentToken', async () => {
+    revokeOtherSessionsMock.mockResolvedValue(undefined)
+
+    await request(app)
+      .delete('/auth/sessions')
+      .set('Authorization', 'Bearer access-token')
+      .set('Cookie', 'refreshToken=current-refresh-token')
+
+    expect(revokeOtherSessionsMock).toHaveBeenCalledWith('user-1', 'current-refresh-token')
+  })
+
+  it('returns 401 MISSING_TOKEN and never calls the service when there is no Authorization header', async () => {
+    const res = await request(app).delete('/auth/sessions')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
+    expect(revokeOtherSessionsMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards a service AppError to the error handler', async () => {
+    revokeOtherSessionsMock.mockRejectedValue(
+      new AppError(
+        'Could not revoke sessions',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        ErrorSeverity.ERROR
+      )
+    )
+
+    const res = await request(app)
+      .delete('/auth/sessions')
+      .set('Authorization', 'Bearer access-token')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(body.message).toBe('Could not revoke sessions')
   })
 })

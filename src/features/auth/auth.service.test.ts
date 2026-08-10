@@ -9,9 +9,11 @@ import {
   cleanupExpiredTokens,
   forgotPassword,
   getProfile,
+  listSessions,
   refresh,
   resetPassword,
   revokeOtherSessions,
+  revokeSession,
   signIn,
   signOut,
 } from './auth.service'
@@ -29,9 +31,16 @@ const refreshTokenCreateMock =
 const refreshTokenUpdateManyMock =
   vi.fn<
     (args: {
-      where: { tokenHash?: string; userId?: string; revokedAt: null }
+      where: { tokenHash?: string; userId?: string; id?: string; revokedAt: null }
       data: { revokedAt: Date }
     }) => Promise<{ count: number }>
+  >()
+const refreshTokenFindManyMock =
+  vi.fn<
+    (args: {
+      where: { userId: string; revokedAt: null; expiresAt: { gt: Date } }
+      orderBy: { createdAt: 'desc' }
+    }) => Promise<{ id: string; tokenHash: string; createdAt: Date; expiresAt: Date }[]>
   >()
 const hashMock = vi.fn<(password: string, saltRounds: number) => Promise<string>>()
 const userUpdateMock =
@@ -77,9 +86,13 @@ vi.mock('@/core/database/prisma', () => ({
       create: async (args: { data: { userId: string; tokenHash: string; expiresAt: Date } }) =>
         refreshTokenCreateMock(args),
       updateMany: async (args: {
-        where: { tokenHash?: string; userId?: string; revokedAt: null }
+        where: { tokenHash?: string; userId?: string; id?: string; revokedAt: null }
         data: { revokedAt: Date }
       }) => refreshTokenUpdateManyMock(args),
+      findMany: async (args: {
+        where: { userId: string; revokedAt: null; expiresAt: { gt: Date } }
+        orderBy: { createdAt: 'desc' }
+      }) => refreshTokenFindManyMock(args),
       deleteMany: async () => refreshTokenDeleteManyMock(),
     },
     passwordResetToken: {
@@ -141,6 +154,7 @@ beforeEach(() => {
   verifyRefreshTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
   refreshTokenCreateMock.mockReset().mockResolvedValue(undefined)
   refreshTokenUpdateManyMock.mockReset().mockResolvedValue({ count: 1 })
+  refreshTokenFindManyMock.mockReset().mockResolvedValue([])
   hashMock.mockReset().mockResolvedValue('hashed-new-password')
   userUpdateMock.mockReset().mockResolvedValue(undefined)
   passwordResetTokenCreateMock.mockReset().mockResolvedValue(undefined)
@@ -619,6 +633,111 @@ describe('resetPassword', () => {
       },
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
+    })
+  })
+})
+
+describe('listSessions', () => {
+  const sessionRows = [
+    {
+      id: 'session-1',
+      tokenHash: 'hashed-refresh-token',
+      createdAt: new Date('2026-08-08T09:00:00.000Z'),
+      expiresAt: new Date('2026-08-09T09:00:00.000Z'),
+    },
+    {
+      id: 'session-2',
+      tokenHash: 'hashed-other-device-token',
+      createdAt: new Date('2026-08-07T09:00:00.000Z'),
+      expiresAt: new Date('2026-08-10T09:00:00.000Z'),
+    },
+  ]
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns every active session with isCurrent flagged for the one matching currentToken', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+    refreshTokenFindManyMock.mockResolvedValue(sessionRows)
+
+    const sessions = await listSessions('user-1', 'refresh-token')
+
+    expect(refreshTokenFindManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        revokedAt: null,
+        expiresAt: { gt: new Date('2026-08-08T10:00:00.000Z') },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    expect(sessions).toEqual([
+      {
+        id: 'session-1',
+        createdAt: sessionRows[0].createdAt,
+        expiresAt: sessionRows[0].expiresAt,
+        isCurrent: true,
+      },
+      {
+        id: 'session-2',
+        createdAt: sessionRows[1].createdAt,
+        expiresAt: sessionRows[1].expiresAt,
+        isCurrent: false,
+      },
+    ])
+  })
+
+  it('flags every session as not current when currentToken is null', async () => {
+    refreshTokenFindManyMock.mockResolvedValue(sessionRows)
+
+    const sessions = await listSessions('user-1', null)
+
+    expect(sessions.every((session) => !session.isCurrent)).toBe(true)
+  })
+
+  it('wraps an unexpected DB failure into a generic AppError instead of leaking it', async () => {
+    refreshTokenFindManyMock.mockRejectedValue(new Error('connection refused'))
+
+    await expect(listSessions('user-1', null)).rejects.toMatchObject({
+      message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    })
+  })
+})
+
+describe('revokeSession', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('revokes the session when it exists and belongs to the requesting user', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+    refreshTokenUpdateManyMock.mockResolvedValue({ count: 1 })
+
+    await expect(revokeSession('user-1', 'session-1')).resolves.toBeUndefined()
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: 'session-1', userId: 'user-1', revokedAt: null },
+      data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
+    })
+  })
+
+  it('throws SESSION_NOT_FOUND when the session does not exist or belongs to another user', async () => {
+    refreshTokenUpdateManyMock.mockResolvedValue({ count: 0 })
+
+    await expect(revokeSession('user-1', 'someone-elses-session')).rejects.toMatchObject({
+      message: AUTH_ERRORS.SESSION_NOT_FOUND,
+      status: HttpStatus.NOT_FOUND,
+    })
+  })
+
+  it('wraps an unexpected DB failure into a generic AppError instead of leaking it', async () => {
+    refreshTokenUpdateManyMock.mockRejectedValue(new Error('connection refused'))
+
+    await expect(revokeSession('user-1', 'session-1')).rejects.toMatchObject({
+      message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
     })
   })
 })
