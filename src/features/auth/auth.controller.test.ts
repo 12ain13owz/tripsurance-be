@@ -12,9 +12,16 @@ const signOutMock = vi.fn<(refreshToken: string | null) => Promise<void>>()
 const refreshMock = vi.fn<(refreshToken: string) => Promise<AuthSession>>()
 const getProfileMock = vi.fn<(userId: string) => Promise<SafeUser>>()
 const changePasswordMock =
-  vi.fn<(userId: string, currentPassword: string, newPassword: string) => Promise<void>>()
+  vi.fn<
+    (
+      userId: string,
+      currentPassword: string,
+      newPassword: string,
+      currentToken: string | null
+    ) => Promise<void>
+  >()
 const forgotPasswordMock = vi.fn<(email: string) => Promise<void>>()
-const resetPasswordMock = vi.fn<(token: string, newPassword: string) => Promise<void>>()
+const resetPasswordMock = vi.fn<(token: string, newPassword: string) => Promise<AuthSession>>()
 const verifyRefreshToken = vi.fn(() => ({ sub: 'user-1', exp: 1893456000 }))
 const verifyAccessTokenMock = vi.fn<(token: string) => { sub: string; iat: number; exp: number }>()
 
@@ -23,8 +30,12 @@ vi.mock('./auth.service', () => ({
   signOut: async (refreshToken: string | null) => signOutMock(refreshToken),
   refresh: async (refreshToken: string) => refreshMock(refreshToken),
   getProfile: async (userId: string) => getProfileMock(userId),
-  changePassword: async (userId: string, currentPassword: string, newPassword: string) =>
-    changePasswordMock(userId, currentPassword, newPassword),
+  changePassword: async (
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    currentToken: string | null
+  ) => changePasswordMock(userId, currentPassword, newPassword, currentToken),
   forgotPassword: async (email: string) => forgotPasswordMock(email),
   resetPassword: async (token: string, newPassword: string) =>
     resetPasswordMock(token, newPassword),
@@ -286,7 +297,24 @@ describe('POST /auth/change-password', () => {
 
     expect(res.status).toBe(HttpStatus.OK)
     expect(body.message).toBe(AUTH_MESSAGES.CHANGE_PASSWORD)
-    expect(changePasswordMock).toHaveBeenCalledWith('user-1', 'CurrentPass1!', 'NewStrong1!')
+    expect(changePasswordMock).toHaveBeenCalledWith('user-1', 'CurrentPass1!', 'NewStrong1!', null)
+  })
+
+  it('passes the refreshToken cookie value through to the service as currentToken', async () => {
+    changePasswordMock.mockResolvedValue(undefined)
+
+    await request(app)
+      .post('/auth/change-password')
+      .set('Authorization', 'Bearer access-token')
+      .set('Cookie', 'refreshToken=current-refresh-token')
+      .send(validBody)
+
+    expect(changePasswordMock).toHaveBeenCalledWith(
+      'user-1',
+      'CurrentPass1!',
+      'NewStrong1!',
+      'current-refresh-token'
+    )
   })
 
   it('returns 401 MISSING_TOKEN and never calls the service when there is no Authorization header', async () => {
@@ -362,14 +390,35 @@ describe('POST /auth/reset-password', () => {
   }
 
   it('returns 200 with the reset-password message on success', async () => {
-    resetPasswordMock.mockResolvedValue(undefined)
+    resetPasswordMock.mockResolvedValue(session)
 
     const res = await request(app).post('/auth/reset-password').send(validBody)
-    const body = res.body as AppResponse<undefined>
+    const body = res.body as AppResponse<{
+      user: SafeUser
+      accessToken: string
+      refreshToken?: string
+    }>
 
     expect(res.status).toBe(HttpStatus.OK)
+    expect(body.data?.user).toEqual({
+      ...session.user,
+      createdAt: session.user.createdAt.toISOString(),
+      updatedAt: session.user.updatedAt.toISOString(),
+    })
+    expect(body.data?.accessToken).toBe('access-token')
+    expect(body.data?.refreshToken).toBeUndefined()
     expect(body.message).toBe(AUTH_MESSAGES.RESET_PASSWORD)
     expect(resetPasswordMock).toHaveBeenCalledWith('raw-reset-token', 'NewStrong1!')
+  })
+
+  it('sets a new httpOnly refreshToken cookie on successful reset', async () => {
+    resetPasswordMock.mockResolvedValue(session)
+
+    const res = await request(app).post('/auth/reset-password').send(validBody)
+    const cookies = res.headers['set-cookie'] as unknown as string[]
+
+    expect(cookies.some((cookie) => cookie.startsWith('refreshToken=refresh-token'))).toBe(true)
+    expect(cookies.some((cookie) => /HttpOnly/i.test(cookie))).toBe(true)
   })
 
   it('returns 422 and never calls the service when the passwords do not match', async () => {

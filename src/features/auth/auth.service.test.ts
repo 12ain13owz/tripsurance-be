@@ -11,6 +11,7 @@ import {
   getProfile,
   refresh,
   resetPassword,
+  revokeOtherSessions,
   signIn,
   signOut,
 } from './auth.service'
@@ -387,12 +388,57 @@ describe('getProfile', () => {
   })
 })
 
+describe('revokeOtherSessions', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('revokes every active session except the one matching currentToken', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+
+    await revokeOtherSessions('user-1', 'refresh-token')
+
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null, tokenHash: { not: 'hashed-refresh-token' } },
+      data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
+    })
+  })
+
+  it('revokes every active session with no exclusion when currentToken is null', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
+
+    await revokeOtherSessions('user-1', null)
+
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null },
+      data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
+    })
+  })
+
+  it('wraps an unexpected DB failure into a generic AppError instead of leaking it', async () => {
+    refreshTokenUpdateManyMock.mockRejectedValue(new Error('connection refused'))
+
+    await expect(revokeOtherSessions('user-1', 'refresh-token')).rejects.toMatchObject({
+      message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    })
+  })
+})
+
 describe('changePassword', () => {
-  it('hashes and saves the new password when the current password matches', async () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('hashes and saves the new password, and revokes every other session, when the current password matches', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-08T10:00:00.000Z'))
     findUnique.mockResolvedValue(activeUser)
     compareMock.mockResolvedValue(true)
 
-    await changePassword('user-1', 'correct-current', 'NewStrong1!')
+    await changePassword('user-1', 'correct-current', 'NewStrong1!', 'refresh-token')
 
     expect(compareMock).toHaveBeenCalledWith('correct-current', activeUser.password)
     expect(hashMock).toHaveBeenCalledWith('NewStrong1!', 10)
@@ -400,13 +446,19 @@ describe('changePassword', () => {
       where: { id: 'user-1' },
       data: { password: 'hashed-new-password' },
     })
+    expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null, tokenHash: { not: 'hashed-refresh-token' } },
+      data: { revokedAt: new Date('2026-08-08T10:00:00.000Z') },
+    })
   })
 
   it('throws INVALID_CURRENT_PASSWORD and does not touch the DB when the current password is wrong', async () => {
     findUnique.mockResolvedValue(activeUser)
     compareMock.mockResolvedValue(false)
 
-    await expect(changePassword('user-1', 'wrong-current', 'NewStrong1!')).rejects.toMatchObject({
+    await expect(
+      changePassword('user-1', 'wrong-current', 'NewStrong1!', 'refresh-token')
+    ).rejects.toMatchObject({
       message: AUTH_ERRORS.INVALID_CURRENT_PASSWORD,
       status: HttpStatus.UNAUTHORIZED,
     })
@@ -416,7 +468,7 @@ describe('changePassword', () => {
   it('throws INVALID_TOKEN when the user id no longer matches an existing user', async () => {
     findUnique.mockResolvedValue(null)
 
-    await expect(changePassword('deleted-user', 'x', 'NewStrong1!')).rejects.toMatchObject({
+    await expect(changePassword('deleted-user', 'x', 'NewStrong1!', null)).rejects.toMatchObject({
       message: ERRORS.AUTH.INVALID_TOKEN,
       status: HttpStatus.UNAUTHORIZED,
     })
@@ -425,7 +477,7 @@ describe('changePassword', () => {
   it('throws ACCOUNT_DISABLED when the user has been deactivated', async () => {
     findUnique.mockResolvedValue({ ...activeUser, isActive: false })
 
-    await expect(changePassword('user-1', 'x', 'NewStrong1!')).rejects.toMatchObject({
+    await expect(changePassword('user-1', 'x', 'NewStrong1!', null)).rejects.toMatchObject({
       message: AUTH_ERRORS.ACCOUNT_DISABLED,
       status: HttpStatus.UNAUTHORIZED,
     })
@@ -522,12 +574,12 @@ describe('resetPassword', () => {
     expect(userUpdateMock).not.toHaveBeenCalled()
   })
 
-  it('updates the password, marks the token used, and revokes every refresh token on success', async () => {
+  it('updates the password, marks the token used, revokes every refresh token, and returns a fresh session', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-08T10:30:00.000Z'))
     passwordResetTokenFindUniqueMock.mockResolvedValue(resetToken)
 
-    await resetPassword('raw-token', 'NewStrong1!')
+    const result = await resetPassword('raw-token', 'NewStrong1!')
 
     expect(userUpdateMock).toHaveBeenCalledWith({
       where: { id: 'user-1' },
@@ -540,6 +592,33 @@ describe('resetPassword', () => {
     expect(refreshTokenUpdateManyMock).toHaveBeenCalledWith({
       where: { userId: 'user-1', revokedAt: null },
       data: { revokedAt: new Date('2026-08-08T10:30:00.000Z') },
+    })
+    expect(signAccessTokenMock).toHaveBeenCalledWith('user-1')
+    expect(signRefreshTokenMock).toHaveBeenCalledWith('user-1')
+    expect(refreshTokenCreateMock).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        tokenHash: 'hashed-refresh-token',
+        expiresAt: new Date(1893456000 * 1000),
+      },
+    })
+    expect(result).toEqual({
+      user: {
+        id: 'user-1',
+        email: 'jane@example.com',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        role: 'ADMIN',
+        isActive: true,
+        isEmailVerified: true,
+        invitedById: null,
+        invitationTokenHash: null,
+        lastInvitationSentAt: null,
+        createdAt: activeUser.createdAt,
+        updatedAt: activeUser.updatedAt,
+      },
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
     })
   })
 })
