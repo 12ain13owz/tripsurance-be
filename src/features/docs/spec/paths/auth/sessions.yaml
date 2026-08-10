@@ -1,0 +1,73 @@
+get:
+  tags:
+    - Auth
+  summary: List the current user's active sessions
+  operationId: listSessions
+  description: >-
+    A "session" is a non-revoked, non-expired RefreshToken row. Requires
+    sending the request with credentials (fetch: `credentials: 'include'`,
+    axios: `withCredentials: true`) so the refreshToken cookie is included —
+    without it, every session in the list has isCurrent: false.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: cookie
+      name: refreshToken
+      required: false
+      schema:
+        type: string
+      description: >-
+        httpOnly refresh token cookie. Used only to flag which listed
+        session is the caller's own (isCurrent).
+  responses:
+    '200':
+      description: Listed sessions successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/session-list-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+delete:
+  tags:
+    - Auth
+  summary: Sign out every other device (revoke all sessions except the current one)
+  operationId: revokeOtherSessions
+  description: >-
+    Requires sending the request with credentials (fetch:
+    `credentials: 'include'`, axios: `withCredentials: true`) so the
+    refreshToken cookie is included — without it, there is no "current"
+    session to exclude, so this revokes every session, including the
+    caller's own.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: cookie
+      name: refreshToken
+      required: false
+      schema:
+        type: string
+      description: httpOnly refresh token cookie. The session it identifies is kept.
+  responses:
+    '200':
+      description: Other sessions revoked successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/message-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'

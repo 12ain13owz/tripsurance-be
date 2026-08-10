@@ -1,0 +1,45 @@
+post:
+  tags:
+    - Auth
+  summary: Exchange the refresh token cookie for a new access/refresh token pair
+  operationId: refresh
+  description: >-
+    Rotates the refresh token: the presented token is revoked and a new one
+    is issued. Presenting an already-used (revoked) token is treated as
+    reuse and rejected with 401 — the client must sign in again.
+  parameters:
+    - in: cookie
+      name: refreshToken
+      required: true
+      schema:
+        type: string
+      description: httpOnly refresh token cookie. Required — 401 if missing.
+  responses:
+    '200':
+      description: Refreshed successfully
+      headers:
+        Set-Cookie:
+          description: New httpOnly `refreshToken` cookie.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/sign-in-response.schema.yaml'
+    '401':
+      description: The refreshToken cookie is missing, or the token was invalid/already used.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          examples:
+            missingCookie:
+              summary: No refreshToken cookie on the request
+              value:
+                message: Authentication required
+                timestamp: '2025-05-29T10:00:00Z'
+            reusedOrInvalidToken:
+              summary: Token already used, revoked, or malformed (reuse detection)
+              value:
+                message: Invalid or expired token
+                timestamp: '2025-05-29T10:00:00Z'

@@ -1,0 +1,11 @@
+type: object
+properties:
+  message:
+    type: string
+    example: Fetched user successfully
+  timestamp:
+    type: string
+    format: date-time
+    example: '2025-05-29T10:00:00Z'
+  data:
+    $ref: './user.schema.yaml'

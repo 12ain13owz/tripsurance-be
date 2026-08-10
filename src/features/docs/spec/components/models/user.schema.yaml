@@ -15,6 +15,7 @@ properties:
     example: Doe
   role:
     type: string
+    enum: [ADMIN, SUPER_ADMIN]
     example: ADMIN
   isActive:
     type: boolean
@@ -22,6 +23,21 @@ properties:
   isEmailVerified:
     type: boolean
     example: true
+  invitedById:
+    type: string
+    nullable: true
+    description: Id of the admin who invited this user, if any.
+    example: null
+  invitationTokenHash:
+    type: string
+    nullable: true
+    description: Hash of this user's pending invitation-acceptance token, if any.
+    example: null
+  lastInvitationSentAt:
+    type: string
+    format: date-time
+    nullable: true
+    example: null
   createdAt:
     type: string
     format: date-time

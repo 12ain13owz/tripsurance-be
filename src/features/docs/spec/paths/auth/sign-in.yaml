@@ -22,6 +22,20 @@ post:
           schema:
             $ref: '../../components/models/sign-in-response.schema.yaml'
     '401':
-      $ref: '../../components/responses/error.response.yaml'
+      description: Email or password is incorrect.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Invalid email or password
+            timestamp: '2025-05-29T10:00:00Z'
     '422':
-      $ref: '../../components/responses/error.response.yaml'
+      description: Request body failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Invalid email format
+            timestamp: '2025-05-29T10:00:00Z'

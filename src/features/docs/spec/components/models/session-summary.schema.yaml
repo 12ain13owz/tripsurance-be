@@ -1,0 +1,22 @@
+type: object
+description: >-
+  A "session" is a non-revoked, non-expired RefreshToken row. tokenHash is
+  never exposed here — id is the only identifier clients use to target a
+  session (e.g. DELETE /auth/sessions/{id}).
+properties:
+  id:
+    type: string
+    example: cjld2cjxh0000qzrmn831i7rn
+  createdAt:
+    type: string
+    format: date-time
+  expiresAt:
+    type: string
+    format: date-time
+  isCurrent:
+    type: boolean
+    description: >-
+      True when this session's refresh token matches the caller's own
+      refreshToken cookie. Always false for every session if the request
+      was made without that cookie.
+    example: true
