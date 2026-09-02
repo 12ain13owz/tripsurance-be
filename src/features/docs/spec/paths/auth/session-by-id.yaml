@@ -1,7 +1,7 @@
 delete:
   tags:
     - Auth
-  summary: Revoke a single session by id
+  summary: Revoke session
   operationId: revokeSession
   description: >-
     Scoped to the requesting user — a session id that doesn't exist or

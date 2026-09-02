@@ -1,9 +1,10 @@
 post:
   tags:
     - Auth
-  summary: Exchange the refresh token cookie for a new access/refresh token pair
+  summary: Refresh access token
   operationId: refresh
   description: >-
+    Exchanges the refresh token cookie for a new access/refresh token pair.
     Rotates the refresh token: the presented token is revoked and a new one
     is issued. Presenting an already-used (revoked) token is treated as
     reuse and rejected with 401 — the client must sign in again.

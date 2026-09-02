@@ -1,8 +1,9 @@
 post:
   tags:
     - Auth
-  summary: Sign in with email and password
+  summary: Sign in
   operationId: signIn
+  description: Signs in with email and password, returning an access token and issuing a refresh token cookie.
   requestBody:
     required: true
     content:

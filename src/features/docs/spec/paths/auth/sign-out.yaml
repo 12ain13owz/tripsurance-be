@@ -1,8 +1,9 @@
 post:
   tags:
     - Auth
-  summary: Sign out and revoke the current refresh token
+  summary: Sign out
   operationId: signOut
+  description: Signs out and revokes the current refresh token.
   parameters:
     - in: cookie
       name: refreshToken

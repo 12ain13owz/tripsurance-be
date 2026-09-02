@@ -1,10 +1,11 @@
 get:
   tags:
     - Auth
-  summary: List the current user's active sessions
+  summary: List sessions
   operationId: listSessions
   description: >-
-    A "session" is a non-revoked, non-expired RefreshToken row. Requires
+    Lists the current user's active sessions. A "session" is a non-revoked,
+    non-expired RefreshToken row. Requires
     sending the request with credentials (fetch: `credentials: 'include'`,
     axios: `withCredentials: true`) so the refreshToken cookie is included —
     without it, every session in the list has isCurrent: false.
@@ -38,10 +39,11 @@ get:
 delete:
   tags:
     - Auth
-  summary: Sign out every other device (revoke all sessions except the current one)
+  summary: Revoke other sessions
   operationId: revokeOtherSessions
   description: >-
-    Requires sending the request with credentials (fetch:
+    Signs out every other device by revoking all sessions except the
+    current one. Requires sending the request with credentials (fetch:
     `credentials: 'include'`, axios: `withCredentials: true`) so the
     refreshToken cookie is included — without it, there is no "current"
     session to exclude, so this revokes every session, including the

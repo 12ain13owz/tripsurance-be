@@ -1,8 +1,9 @@
 get:
   tags:
     - Auth
-  summary: Get the current authenticated user's profile
+  summary: Get current user
   operationId: me
+  description: Returns the current authenticated user's profile.
   security:
     - bearerAuth: []
   responses:
