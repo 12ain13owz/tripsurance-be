@@ -10,9 +10,11 @@ properties:
   createdAt:
     type: string
     format: date-time
+    example: '2025-05-29T07:28:04.886Z'
   expiresAt:
     type: string
     format: date-time
+    example: '2025-06-05T07:28:04.886Z'
   isCurrent:
     type: boolean
     description: >-
