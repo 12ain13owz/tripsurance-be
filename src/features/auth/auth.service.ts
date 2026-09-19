@@ -242,7 +242,7 @@ export const forgotPassword = async (email: string) => {
     { operation: 'forgotPassword', metadata: { userId: user.id } }
   )
 
-  const resetUrl = `${env.FRONTEND_URL}/reset-password?token=${rawToken}`
+  const resetUrl = `${env.FRONTEND_URL}/admin/reset-password?token=${rawToken}`
   const { subject, html } = passwordResetEmail({
     resetUrl,
     token: rawToken,
