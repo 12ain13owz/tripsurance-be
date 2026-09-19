@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import { randomUUID } from 'node:crypto'
 import { env } from '@/core/config'
 import { AppError } from '@/core/error'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
@@ -12,7 +13,7 @@ export const signAccessToken = (sub: string) =>
   jwt.sign({ sub }, env.JWT_ACCESS_SECRET, { expiresIn: accessExpires })
 
 export const signRefreshToken = (sub: string): string =>
-  jwt.sign({ sub }, env.JWT_REFRESH_SECRET, { expiresIn: refreshExpires })
+  jwt.sign({ sub, jti: randomUUID() }, env.JWT_REFRESH_SECRET, { expiresIn: refreshExpires })
 
 export const verifyAccessToken = (token: string): AccessTokenPayload => {
   try {
