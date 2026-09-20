@@ -139,6 +139,16 @@ docker compose down
 
 The image compiles TypeScript at build time and runs the compiled output (`npm start`), with `NODE_ENV=production` by default. Run `npm run setup-env` first so `.env.prod` exists — `docker-compose.yml` loads it via `env_file` (it is not copied into the image).
 
+### Stripe webhook forwarding (local dev)
+
+Forward Stripe test-mode webhooks to the local dev server without installing the Stripe CLI:
+
+```bash
+npm run stripe:listen
+```
+
+Wait for `Ready! Your webhook signing secret is whsec_...` in the logs, copy it into `STRIPE_WEBHOOK_SECRET` in `.env.dev`, then restart `npm run dev`. Ctrl+C stops the forwarder. Uses the `stripe-cli` service (`docker-compose.yml`, `profiles: [stripe]`), so it never starts with a plain `docker compose up`.
+
 ## Project Structure
 
 ```text
