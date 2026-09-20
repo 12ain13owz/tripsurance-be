@@ -15,13 +15,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cleanup:tokens": "tsx --env-file-if-exists=.env.dev scripts/cleanup-tokens.ts",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset",
-    "db:seed": "prisma db seed"
+    "db:generate": "tsx scripts/prisma-env.ts generate",
+    "db:migrate": "tsx scripts/prisma-env.ts migrate dev",
+    "db:deploy": "tsx scripts/prisma-env.ts migrate deploy",
+    "db:deploy:prod": "tsx scripts/prisma-env.ts --env-file=.env.prod migrate deploy",
+    "db:push": "tsx scripts/prisma-env.ts db push",
+    "db:studio": "tsx scripts/prisma-env.ts studio",
+    "db:studio:prod": "tsx scripts/prisma-env.ts --env-file=.env.prod studio",
+    "db:reset": "tsx scripts/prisma-env.ts migrate reset",
+    "db:seed": "tsx scripts/prisma-env.ts db seed",
+    "db:seed:prod": "tsx scripts/prisma-env.ts --env-file=.env.prod db seed"
   },
   "scripts-info": {
     "start": "Runs the compiled application in production mode using environment variables.",
