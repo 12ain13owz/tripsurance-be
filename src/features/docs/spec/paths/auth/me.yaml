@@ -1,0 +1,39 @@
+get:
+  tags:
+    - Auth
+  summary: Get current user
+  operationId: me
+  description: Returns the current authenticated user's profile.
+  security:
+    - bearerAuth: []
+  responses:
+    '200':
+      description: Fetched user successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/me-response.schema.yaml'
+    '401':
+      description: >-
+        Missing/invalid bearer token, the user no longer exists, or the
+        account has been disabled.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          examples:
+            missingToken:
+              summary: No Authorization header
+              value:
+                message: Authentication required
+                timestamp: '2025-05-29T10:00:00Z'
+            userNoLongerExists:
+              summary: The user tied to a still-valid access token was deleted
+              value:
+                message: Invalid or expired token
+                timestamp: '2025-05-29T10:00:00Z'
+            accountDisabled:
+              summary: The user's account has been deactivated
+              value:
+                message: This account has been disabled
+                timestamp: '2025-05-29T10:00:00Z'

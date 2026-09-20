@@ -8,13 +8,24 @@ If anything here conflicts with the actual code, the code wins — update this f
 
 ## 1. What this project is
 
-A feature-based REST API **starter**: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It ships as a clean base for new projects to build on top of.
+**tripsurance-be** is the backend for a trip/travel insurance sales platform. This service covers the **admin side only** — internal staff (admin, super admin) who manage the platform. It does **not** serve end-customer/policyholder flows (no public quote/purchase API here — that's a separate concern/service if/when it exists).
 
-Not wired up yet — add inside the existing structure when a consuming project needs it, don't pre-build it speculatively:
+Consequences of "admin-only, invite-based" that shape how features get built:
 
-- **Database / ORM** — none.
-- **Auth** — none (`req.user`, JWT, sessions, etc. don't exist).
-- **Custom middleware folder** — cors/helmet/rate-limit are plain option objects (`core/config/options.ts`) wired directly in `main.ts`, not middleware functions. There is no `core/middleware/` folder until a feature actually needs one (auth guard, request validation, ...).
+- **No self-registration.** `User` accounts are created via invite (`invitedById`/`invitationTokenHash` on the `User` model, `prisma/schema/user.prisma`) — there is no public sign-up endpoint and none should be added. Auth today only exposes sign-in (`POST /auth/sign-in`).
+- **Two roles only** — `ADMIN`, `SUPER_ADMIN` (`Role` enum, `prisma/schema/user.prisma`). No customer/policyholder role exists in this codebase.
+- When adding a feature, ask "is this something an admin does to manage the platform?" — if it's customer-facing (getting a quote, buying a policy, filing a claim as the end user), confirm with the person assigning the work before building it here.
+
+Technically, it's a feature-based REST API: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It started from a generic starter template and has since diverged into this domain-specific backend — most of what follows in this doc is the starter's conventions, still enforced.
+
+Already wired up in this project (diverged from the bare `node-express-ts-starter` base — check that repo if you need the generic, auth-free version):
+
+- **Database / ORM** — Prisma (`prisma/schema/`), client exported from `@/core/database/prisma`.
+- **Auth** — JWT access + refresh tokens (`@/core/security/jwt.ts`), sign-in/refresh/sign-out flows in `src/features/auth/`. Refresh token travels as an httpOnly cookie (`auth.cookie.ts`); access token is returned in the response body and expected as a `Bearer` header on protected routes.
+- **Custom middleware folder** — `src/core/middleware/` exists: `validate.ts` (Zod request validation) and `authenticate.ts` (verifies the access token, attaches the payload to `req.user`), each wired per-route (see `auth.routes.ts`).
+
+Still not wired up — add only when a consuming feature actually needs it, don't pre-build speculatively:
+
 - **i18n / structured messages** — `AppError`/`createResponse` take a plain `string` message. Do not introduce a `{ key, message, params }` message shape or an i18n layer speculatively; that's a real requirement of specific downstream products, not a default this starter should carry.
 
 ### Testing
@@ -40,10 +51,11 @@ When tests are requested, follow this standard so output stays consistent across
 ```
 src/
   core/      # Infrastructure, app-wide. Knows nothing about specific features.
-    config/    # env loading + Zod validation, runtime options (cors/helmet/rate-limit)
-    error/     # AppError, error logger, error middleware
-    logger/    # Winston setup
-    server/    # bootstrap + graceful shutdown
+    config/     # env loading + Zod validation, runtime options (cors/helmet/rate-limit)
+    error/      # AppError, error logger, error middleware
+    logger/     # Winston setup
+    middleware/ # custom route middleware (validate, authenticate)
+    server/     # bootstrap + graceful shutdown
   features/  # Business features. One folder per feature. May import core + shared.
   shared/    # Pure building blocks (constants, types, utils). No feature/business logic.
   main.ts    # Entry point: middleware wiring + startServer
@@ -84,6 +96,24 @@ features  ->  shared
 - Prefix intentionally unused params with `_` (e.g. `_req`, `_next`).
 - Every Promise must be awaited or handled (`no-floating-promises`).
 
+#### `null` vs `undefined`
+
+- Prefer `null` for a value _we_ deliberately return to mean "intentionally absent" in our own
+  domain logic — e.g. a lookup that found nothing, matching how Prisma itself already returns
+  `null` for nullable columns and missing records (`User | null`).
+- Keep `undefined` for optional parameters/properties (`foo?: string`) — that's the language's own
+  idiom; don't fight it by requiring callers to pass `null` explicitly.
+- Keep `undefined` for values sourced from an external dependency/runtime API that already returns
+  `undefined` (`process.env.X`, `Array.prototype.find`, etc.) — don't convert at the boundary.
+- Keep `undefined` anywhere the logging or response layer treats it as a deliberate **elision**
+  sentinel — don't "fix" these. `extractMetadata` (`core/logger/logger.ts`) drops any metadata key
+  whose value is `undefined` but logs `null` values as-is, and `JSON.stringify` drops `undefined`
+  object fields but serializes `null` explicitly (see `error.middleware.ts`'s dev-only `data`
+  field). Swapping one of these to `null` isn't a no-op — a field that was cleanly omitted from a
+  log line or response body would start showing up as an explicit `null`. `core/logger/stack.ts`'s
+  `getCallerSource` is the concrete example: it looks like a "value we control, prefer null" case,
+  but it feeds straight into that elision path, so it stays `undefined`.
+
 ### Logging & env
 
 - Never use `console.*` for app logging — use the Winston `logger` from `@/core/logger` (`console.info`/`warn`/`error` are only tolerated inside `core/config/env/env.ts`, for bootstrap messages that run before the logger/env are ready).
@@ -99,11 +129,15 @@ features  ->  shared
 | Service          | `<feature>.service.ts`    | `auth.service.ts`             |
 | Validation (Zod) | `<feature>.schema.ts`     | `auth.schema.ts`              |
 | Types            | `<feature>.type.ts`       | `auth.type.ts`                |
-| Middleware       | `<name>.middleware.ts`    | `authenticate.middleware.ts`  |
+| Middleware       | `<name>.ts`               | `authenticate.ts`             |
 | Constants        | `<name>.const.ts`         | `message.const.ts`            |
 | Barrel           | `index.ts`                | re-exports the public surface |
 
 Skip files you genuinely don't need — e.g. `src/features/health/` only has `health.routes.ts` + `health.controller.ts` (no service, no schema) because there's nothing to validate or delegate. Keep the naming when you do add a file.
+
+Middleware is the one exception to the role-suffix rule: files under `src/core/middleware/` (e.g. `validate.ts`, `authenticate.ts`) skip the `.middleware.ts` suffix — the folder itself already says "middleware", so the suffix would be redundant. Feature-local middleware, if a feature ever needs its own, follows the same no-suffix rule.
+
+**Messages:** generic, reusable text (CRUD success/fail wording, HTTP-generic errors) belongs in `SUCCESS`/`ERRORS` in `shared/constants/message.const.ts` — extend it, don't duplicate. A feature may keep its own `<feature>.const.ts` (e.g. `auth.const.ts`) only for messages specific to that feature's domain (e.g. "Invalid email or password") that wouldn't make sense reused elsewhere. Default to the shared file when in doubt.
 
 ### Config (`src/core/config/`)
 
@@ -126,10 +160,11 @@ Import `env` from `@/core/config`, never from `./env/env`. Add env-dependent mid
 { message: string, timestamp: string, data?: T }
 ```
 
-- Response messages come from `SUCCESS` / `ERRORS` in `@/shared/constants` (extend them, don't hardcode strings). These are plain strings — no i18n key/message object (see §1).
+- Response messages come from `SUCCESS`/`ERRORS` in `@/shared/constants`, or from a feature-local `<feature>.const.ts` for messages specific to that feature's domain (see §3) — never hardcoded inline strings. These are plain strings — no i18n key/message object (see §1).
 - Console-only strings (startup/config logs, never sent to a client) come from the separate `LOG` constant in the same file. Don't mix the two: if it's only ever passed to `console.*`, it belongs in `LOG`, not `SUCCESS`/`ERRORS`.
 - HTTP codes come from the `HttpStatus` enum, never magic numbers.
-- To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` in `main.ts` formats it (full details in development, message-only in production).
+- To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` (`core/error/error.middleware.ts`, wired in `app.ts`) formats it (full details in development, message-only in production).
+- Malformed JSON request bodies never reach a controller — `express.json()` throws before routing, and the error isn't an `AppError`. `errorHandler` detects this case (`SyntaxError` with `.type === 'entity.parse.failed'`) and normalizes it to a `400` `AppError` (`ERRORS.GENERIC.INVALID_JSON_BODY`) instead of leaking the raw parser message and defaulting to `500`. Follow the same normalize-before-formatting approach for any other non-`AppError` exception that has a well-known client-facing meaning.
 
 `AppError` builder methods:
 
@@ -146,6 +181,19 @@ Controllers are thin: validate input, call a service, return via `createResponse
 
 Reference implementation in this repo: `src/features/health/` (routes + controller only — a real CRUD feature would add `.service.ts` and `.schema.ts` too, as below).
 
+Before calling `createResponse`, assign the payload to a locally-typed `data` constant instead of
+passing the service's return value straight through. This makes the response shape visible to
+whoever opens the controller — no need to jump into the service or type file to know what's
+being sent — and, since the type is a plain assignment (not an object literal), it still won't
+catch excess properties on its own; if a field must never leave the service (a token, a hash),
+strip it explicitly via destructuring before this assignment, not just via the type. Name the
+type `<Feature><Action>Data` (e.g. `LoginData`) — it describes the `data` field's shape, not the
+full response envelope — and keep the local variable named `data` so it matches
+`createResponse`'s own parameter name. Likewise, assign `createResponse`'s result to its own
+`response` constant before calling `res.json` — don't nest the call inside `.json(...)`. Keeping
+each step (`data` -> `response` -> `res.status(...).json(response)`) on its own line reads as a
+sequence of named steps instead of one dense expression:
+
 ```ts
 import { HttpStatus, SUCCESS } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
@@ -153,13 +201,15 @@ import { createResponse } from '@/shared/utils'
 import * as authService from './auth.service'
 import { loginSchema } from './auth.schema'
 
+import type { LoginData } from './auth.type'
 import type { NextFunction, Request, Response } from 'express'
 
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const credentials = loginSchema.parse(req.body)
-    const result = await authService.login(credentials)
-    res.status(HttpStatus.OK).json(createResponse(SUCCESS.AUTH.LOGIN, result))
+    const data: LoginData = await authService.login(credentials)
+    const response = createResponse(SUCCESS.AUTH.LOGIN, data)
+    res.status(HttpStatus.OK).json(response)
   } catch (error) {
     next(error)
   }
@@ -248,19 +298,48 @@ import { authRouter } from '@/features/auth'
 router.use('/auth', authRouter)
 ```
 
-9. **Document the endpoint** (OpenAPI): the spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
+9. **Document the endpoint** (OpenAPI) — write this once manual testing (§8) confirms the endpoint's behavior, not while first implementing it; land it together with the tests in the same follow-up change. The spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
+
+   **`summary` vs `description`** — `summary` is the operation's display name in the docs UI (Scalar) and must stay a short verb phrase, 2–4 words, Title Case, no trailing punctuation (`Sign in`, `List sessions`, `Revoke other sessions`) — mirror the short name already used for the same request in `tripsurance.postman_collection.json` where one exists. Everything else — behavior, edge cases, rate limits, side effects, gotchas for the client — goes in `description`, not `summary`. Don't restate the summary at the start of the description; write description as if summary weren't there. `operationId` (camelCase, e.g. `signIn`, `listSessions`) is separate from both and used for codegen, not display — keep it short too but it doesn't need to match `summary` word-for-word.
 
 10. **Verify** (section 7).
 
 ## 7. Middleware
 
-There's no `core/middleware/` folder yet — the only middleware wired up today is third-party (`cors`, `helmet`, `express-rate-limit`, `morgan`), configured as plain options in `core/config/options.ts` and applied directly in `main.ts`. When a feature needs actual custom middleware (auth guard, request validation, etc.):
+Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is configured as plain options in `core/config/options.ts` and applied directly in `main.ts`. Custom middleware lives in `src/core/middleware/` (see `validate.ts`, `authenticate.ts`), one file per concern, exported from its `index.ts`:
 
-- Cross-feature middleware goes in `src/core/middleware/`, one file per concern (`<name>.middleware.ts`), exported from its `index.ts`.
+- Cross-feature middleware goes in `src/core/middleware/`.
 - Feature-specific middleware can live in the feature folder instead.
-- Wire global middleware in `main.ts`.
+- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route.
 
-## 8. Definition of done — always run before finishing
+### Typed `req` narrowing (`authenticate` + `AuthenticatedRequest`)
+
+`authenticate` (`core/middleware/authenticate.ts`) verifies the `Authorization: Bearer` access token and sets `req.user` to the decoded payload before calling `next()`; `req.user` is `AccessTokenPayload | undefined` globally (`core/types/express.d.ts`) since most routes aren't authenticated. For a route that _is_ behind `authenticate`, don't re-check `req.user` for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead, type the controller's `req` param as `AuthenticatedRequest` (exported from `authenticate.ts`), which narrows `user` to always-present:
+
+```ts
+export const me = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data: SafeUser = await authService.getProfile(req.user.sub) // no `?`, no null check
+    ...
+```
+
+Express's `RequestHandler` type can't structurally accept a handler whose `req` is narrower than the base `Request` (its `user` field isn't a generic slot like `body`/`params`/`query`, so Express can't infer it) — wrap the handler with `asHandler` (`shared/utils/handler.util.ts`) at the route registration site to bridge it:
+
+```ts
+router.get('/me', authenticate, asHandler(authController.me))
+```
+
+`asHandler` is a generic, dependency-free adapter (`<TReq>(handler) => RequestHandler`) — it belongs in `shared/` because it doesn't know about `AuthenticatedRequest` or any other concrete type; `TReq` is inferred from whatever handler you pass in, so you never need to write the type argument explicitly. Reuse the same `asHandler` for any other middleware that narrows `req` beyond what Express's own generics express — don't write a new one-off adapter per middleware.
+
+## 8. Definition of done
+
+A feature moves through these stages, in order:
+
+1. **Implement** the feature per the shapes in §5–6.
+2. **Manual test** the endpoint (e.g. via Postman) — happy path + main error paths.
+3. Once manual testing confirms the behavior is correct, **write tests** (§1) and the
+   **OpenAPI doc** (§6 step 9) together, in the same follow-up change.
+4. Run:
 
 ```bash
 npm run fix     # ESLint --fix + Prettier
@@ -268,7 +347,9 @@ npm run build   # type-check + compile (must pass with no errors)
 npm test        # run whenever test files exist for the touched code (see §1 Testing)
 ```
 
-A change is complete only when these succeed and the new feature router is mounted in `src/routes.ts`.
+It's fine to land stage 1 as its own commit before stages 2–3 are finished — just don't
+call the feature "done" (or open it for review/PR) until docs + tests land. A feature is
+only complete once all four stages pass and the router is mounted in `src/routes.ts`.
 
 ## 9. Quick do / don't
 
@@ -278,7 +359,7 @@ A change is complete only when these succeed and the new feature router is mount
 - DO add new env vars to the Zod schema (`core/config/env/env.schema.ts`), the `EnvConfig` type (`core/config/env/env.type.ts`), and `.env.example`; use `z.coerce.number()` for numeric ones.
 - DON'T import across features, hardcode response strings, throw raw `Error`, use `any`, read `process.env` directly, or use `console.log`.
 - DON'T put secrets (passwords, tokens) into `AppError` metadata or logs.
-- DON'T add a database, auth, i18n message keys, or a `core/middleware/` folder speculatively — this is a starter; add them when a real feature needs them (see §1).
+- DON'T add i18n message keys speculatively — this is a starter derivative; add them when a real feature needs them (see §1).
 
 ## 10. Commit messages
 
@@ -316,7 +397,13 @@ fix(logger): prevent metadata from clobbering reserved log fields
 
 **Don't:** paste full diffs; list every renamed method; use past tense ("added", "fixed"); commit secrets (`.env`, credentials).
 
-## 11. Git workflow
+## 11. Change approval
+
+- Before editing any code, list the specific changes you plan to make and wait for explicit go-ahead — don't start editing on your own initiative just because a request implies a code change.
+- Exception: if the user's message already gives the go-ahead ("confirm, go ahead", "fix it", "implement this"), proceed without a separate list-first round.
+- This covers all code changes, not just git actions — see §12 Git workflow below for commit/push-specific rules.
+
+## 12. Git workflow
 
 - Work **one logical change per commit** — small, reviewable slices; do not batch unrelated changes.
 - **Do NOT run `git commit` or `git push`** unless the user explicitly asks.

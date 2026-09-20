@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createResponse } from './response.utils'
+import { createResponse } from './response.util'
 
 describe('createResponse', () => {
   afterEach(() => {

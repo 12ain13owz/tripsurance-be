@@ -1,0 +1,48 @@
+type: object
+properties:
+  id:
+    type: string
+    example: cly1a2b3c0000qzrm5g8h9j0k
+  email:
+    type: string
+    format: email
+    example: jane@example.com
+  firstName:
+    type: string
+    example: Jane
+  lastName:
+    type: string
+    example: Doe
+  role:
+    type: string
+    enum: [ADMIN, SUPER_ADMIN]
+    example: ADMIN
+  isActive:
+    type: boolean
+    example: true
+  isEmailVerified:
+    type: boolean
+    example: true
+  invitedById:
+    type: string
+    nullable: true
+    description: Id of the admin who invited this user, if any.
+    example: null
+  invitationTokenHash:
+    type: string
+    nullable: true
+    description: Hash of this user's pending invitation-acceptance token, if any.
+    example: null
+  lastInvitationSentAt:
+    type: string
+    format: date-time
+    nullable: true
+    example: null
+  createdAt:
+    type: string
+    format: date-time
+    example: '2025-05-29T07:28:04.886Z'
+  updatedAt:
+    type: string
+    format: date-time
+    example: '2025-06-02T09:15:30.500Z'

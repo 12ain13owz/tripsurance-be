@@ -1,0 +1,13 @@
+type: object
+required:
+  - email
+  - password
+properties:
+  email:
+    type: string
+    format: email
+    example: jane@example.com
+  password:
+    type: string
+    description: No minimum length or complexity is enforced on sign-in (only on new passwords).
+    example: correct-password

@@ -1,0 +1,42 @@
+post:
+  tags:
+    - Auth
+  summary: Sign in
+  operationId: signIn
+  description: Signs in with email and password, returning an access token and issuing a refresh token cookie.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/sign-in-request.schema.yaml'
+  responses:
+    '200':
+      description: Signed in successfully
+      headers:
+        Set-Cookie:
+          description: HttpOnly `refreshToken` cookie used to obtain new access tokens.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/sign-in-response.schema.yaml'
+    '401':
+      description: Email or password is incorrect.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Invalid email or password
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: Request body failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Invalid email format
+            timestamp: '2025-05-29T10:00:00Z'

@@ -10,19 +10,67 @@ servers:
 tags:
   - name: Health
     description: Service health checks
+  - name: Auth
+    description: Authentication
 
 paths:
   /health:
     $ref: './paths/health/health.yaml'
   /health/error:
     $ref: './paths/health/error.yaml'
+  /auth/sign-in:
+    $ref: './paths/auth/sign-in.yaml'
+  /auth/sign-out:
+    $ref: './paths/auth/sign-out.yaml'
+  /auth/refresh:
+    $ref: './paths/auth/refresh.yaml'
+  /auth/me:
+    $ref: './paths/auth/me.yaml'
+  /auth/change-password:
+    $ref: './paths/auth/change-password.yaml'
+  /auth/forgot-password:
+    $ref: './paths/auth/forgot-password.yaml'
+  /auth/reset-password:
+    $ref: './paths/auth/reset-password.yaml'
+  /auth/sessions:
+    $ref: './paths/auth/sessions.yaml'
+  /auth/sessions/{id}:
+    $ref: './paths/auth/session-by-id.yaml'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Access token returned by sign-in/refresh/reset-password, sent as an
+        Authorization header in the form "Bearer <token>".
   schemas:
     HealthResponse:
       $ref: './components/models/health.schema.yaml'
     HealthErrorResponse:
       $ref: './components/models/error.schema.yaml'
+    SignInRequest:
+      $ref: './components/models/sign-in-request.schema.yaml'
+    SignInResponse:
+      $ref: './components/models/sign-in-response.schema.yaml'
+    User:
+      $ref: './components/models/user.schema.yaml'
+    MessageResponse:
+      $ref: './components/models/message-response.schema.yaml'
+    MeResponse:
+      $ref: './components/models/me-response.schema.yaml'
+    ChangePasswordRequest:
+      $ref: './components/models/change-password-request.schema.yaml'
+    ForgotPasswordRequest:
+      $ref: './components/models/forgot-password-request.schema.yaml'
+    ResetPasswordRequest:
+      $ref: './components/models/reset-password-request.schema.yaml'
+    SessionSummary:
+      $ref: './components/models/session-summary.schema.yaml'
+    SessionListResponse:
+      $ref: './components/models/session-list-response.schema.yaml'
   responses:
     SuccessResponse:
       $ref: './components/responses/success.response.yaml'

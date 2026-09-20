@@ -5,4 +5,11 @@ get:
   operationId: healthErrorCheck
   responses:
     '400':
-      $ref: '../../components/responses/error.response.yaml'
+      description: Always throws — demonstrates the error envelope shape.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Test error function
+            timestamp: '2025-05-29T10:00:00Z'

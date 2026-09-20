@@ -1,11 +1,14 @@
 import { env } from '@/core/config'
 import { logger } from '@/core/logger'
-import { ERRORS, HttpStatus } from '@/shared/constants'
+import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { AppEnv } from '@/shared/types'
 import { createResponse } from '@/shared/utils'
 import { AppError } from './app-error'
 import { ErrorLogger } from './error-logger'
 import type { NextFunction, Request, Response } from 'express'
+
+const isJsonBodyError = (error: Error): boolean =>
+  error instanceof SyntaxError && 'type' in error && error.type === 'entity.parse.failed'
 
 export const errorHandler = async (
   error: AppError | Error,
@@ -14,10 +17,14 @@ export const errorHandler = async (
   _next: NextFunction
 ): Promise<void> => {
   try {
-    const structured = ErrorLogger.log(error)
+    const normalized = isJsonBodyError(error)
+      ? new AppError(ERRORS.GENERIC.INVALID_JSON_BODY, HttpStatus.BAD_REQUEST, ErrorSeverity.WARN)
+      : error
 
-    const status = error instanceof AppError ? error.status : HttpStatus.INTERNAL_SERVER_ERROR
-    const message = error.message ? error.message : ERRORS.GENERIC.INTERNAL_SERVER_ERROR
+    const structured = ErrorLogger.log(normalized)
+    const status =
+      normalized instanceof AppError ? normalized.status : HttpStatus.INTERNAL_SERVER_ERROR
+    const message = normalized.message ? normalized.message : ERRORS.GENERIC.INTERNAL_SERVER_ERROR
 
     // Production: only message + timestamp reach the client.
     // Development: attach structured details (status, context, stack) for debugging.
@@ -31,7 +38,6 @@ export const errorHandler = async (
             stack: structured.error.stack,
           }
         : undefined
-
     const response = createResponse(message, data)
 
     res.status(status).json(response)

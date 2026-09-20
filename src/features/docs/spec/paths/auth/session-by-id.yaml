@@ -1,0 +1,56 @@
+delete:
+  tags:
+    - Auth
+  summary: Revoke session
+  operationId: revokeSession
+  description: >-
+    Scoped to the requesting user — a session id that doesn't exist or
+    belongs to another user both return 404, so existence of another
+    user's session is never leaked. Revoking the caller's own current
+    session does not clear its refreshToken cookie (unlike POST
+    /auth/sign-out); the client should route "sign out this device" to
+    sign-out instead of this endpoint.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: RefreshToken row id (cuid) — not the raw token or its hash.
+      example: cjld2cjxh0000qzrmn831i7rn
+  responses:
+    '200':
+      description: Session revoked successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/message-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No such session, or it belongs to another user.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Session not found
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: id is not a valid session id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Invalid session id format
+            timestamp: '2025-05-29T10:00:00Z'

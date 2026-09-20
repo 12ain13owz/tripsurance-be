@@ -15,6 +15,7 @@ export const SUCCESS = {
     DELETED: 'Data deleted successfully',
   },
   UTIL: {
+    list: (name: string) => `Listed ${name} successfully`,
     create: (name: string) => `Created ${name} successfully`,
     update: (name: string) => `Updated ${name} successfully`,
     delete: (name: string) => `Deleted ${name} successfully`,
@@ -35,6 +36,14 @@ export const ERRORS = {
     TOO_MANY_REQUESTS: 'Too many requests. Please try again later',
     BAD_GATEWAY: 'Bad gateway',
     UNSPECIFIED_FUNCTION: 'Unspecified function',
+    INVALID_JSON_BODY: 'Invalid JSON in request body',
+  },
+  AUTH: {
+    MISSING_TOKEN: 'Authentication required',
+    INVALID_TOKEN: 'Invalid or expired token',
+  },
+  MAIL: {
+    SEND_FAILED: 'Failed to send email. Please try again later',
   },
   UTIL: {
     notFound: (item: string) => `${item} not found`,
@@ -42,6 +51,8 @@ export const ERRORS = {
     invalidField: (field: string) => `Invalid ${field} format`,
     invalidType: (field: string, type: string) => `${field} must be of type ${type}`,
     requiredField: (field: string) => `${field} is required`,
+    minLength: (field: string, length: number) => `${field} must be at least ${length} characters`,
     failedAction: (action?: string, target?: string) => `Failed to ${action} ${target}`,
+    weakPassword: (field: string) => `${field} is too weak`,
   },
 }
