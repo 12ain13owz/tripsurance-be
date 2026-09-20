@@ -14,6 +14,10 @@ RUN npm ci
 # Copy the rest of the application
 COPY . .
 
+# Generate the Prisma client (src/generated/prisma is gitignored — not present
+# in the build context, so it must be regenerated here before compiling).
+RUN npm run db:generate
+
 # Compile TypeScript during image build (build stage has more memory available
 # than the running instance) — avoids OOM on small/free hosting plans at startup.
 RUN npm run build
