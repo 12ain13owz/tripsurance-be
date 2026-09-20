@@ -3,8 +3,7 @@
 import { existsSync } from 'node:fs'
 import { defineConfig } from 'prisma/config'
 
-const envFile = process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev'
-if (existsSync(envFile)) process.loadEnvFile(envFile)
+if (existsSync('.env.dev')) process.loadEnvFile('.env.dev')
 
 export default defineConfig({
   schema: 'prisma/schema',
@@ -13,6 +12,6 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: process.env['DATABASE_URL'],
+    url: process.env['DIRECT_URL'] ?? process.env['DATABASE_URL'],
   },
 })
