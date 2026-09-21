@@ -1,16 +1,23 @@
 import { AppError } from '@/core/error'
-import type { AuthenticatedRequest } from '@/core/middleware/authenticate'
+import type { AuthenticatedRequest } from '@/core/middleware'
 import { verifyRefreshToken } from '@/core/security'
 import { ERRORS, ErrorSeverity, HttpStatus, SUCCESS } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
 import { AUTH_MESSAGES } from './auth.const'
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './auth.cookie'
 import * as authService from './auth.service'
-import type { AuthReq, ProtectedAuthReq, SafeUser, SessionSummary, SignInData } from './auth.type'
+import type {
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  RevokeSessionInput,
+  SignInInput,
+} from './auth.schema'
+import type { SafeUser, SessionSummary, SignInData } from './auth.type'
 import type { Request, Response, NextFunction } from 'express'
 
 export const signIn = async (
-  req: AuthReq<'signIn'>,
+  req: Request<unknown, unknown, SignInInput>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -86,7 +93,7 @@ export const me = async (
 }
 
 export const changePassword = async (
-  req: ProtectedAuthReq<'changePassword'>,
+  req: AuthenticatedRequest<unknown, unknown, ChangePasswordInput>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -105,7 +112,7 @@ export const changePassword = async (
 }
 
 export const forgotPassword = async (
-  req: AuthReq<'forgotPassword'>,
+  req: Request<unknown, unknown, ForgotPasswordInput>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -122,7 +129,7 @@ export const forgotPassword = async (
 }
 
 export const resetPassword = async (
-  req: AuthReq<'resetPassword'>,
+  req: Request<unknown, unknown, ResetPasswordInput>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -160,7 +167,7 @@ export const listSessions = async (
 }
 
 export const revokeSession = async (
-  req: ProtectedAuthReq<'revokeSession'>,
+  req: AuthenticatedRequest<RevokeSessionInput>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

@@ -135,7 +135,15 @@ features  ->  shared
 
 Skip files you genuinely don't need — e.g. `src/features/health/` only has `health.routes.ts` + `health.controller.ts` (no service, no schema) because there's nothing to validate or delegate. Keep the naming when you do add a file.
 
+The `<feature>.type.ts` role isn't feature-only — the same rule applies to any `core/` module that exports a type (`validate.type.ts`, `authenticate.type.ts`, `mailer.type.ts`, `error.type.ts`). Split a type into its own `<name>.type.ts` as soon as it's exported, even if only one file currently consumes it — don't wait for a second consumer before splitting, and don't leave it inlined in the implementation file "because nothing else uses it yet" (`core/middleware/authenticate.ts` and `validate.ts` are the reference examples).
+
 Middleware is the one exception to the role-suffix rule: files under `src/core/middleware/` (e.g. `validate.ts`, `authenticate.ts`) skip the `.middleware.ts` suffix — the folder itself already says "middleware", so the suffix would be redundant. Feature-local middleware, if a feature ever needs its own, follows the same no-suffix rule.
+
+### Function naming (controller ↔ service)
+
+A controller's exported function name must match its service function name exactly (e.g. `authController.signIn` calls `authService.signIn`) — this lets a reader trace `controller.X` -> `service.X` without guessing. Diverge only when the HTTP-facing name and the business action are genuinely different concepts — e.g. `authController.me` calls `authService.getProfile`: `/me` is a REST/whoami convention, not a description of what happens. This should stay rare; don't reach for it just because a shorter or catchier controller name is tempting.
+
+Within a function name, don't repeat the entity its feature module already identifies via the namespaced import (`countryService.list()`, not `countryService.listCountry()`) — the import alias already carries that context. Use the bare CRUD verb (`list`, `create`, `update`, `remove`) whenever the feature module manages a single entity end-to-end. Only qualify the verb with the entity name (`listSessions`, `revokeSession`) when the feature module manages more than one entity/concern and the bare verb alone would be ambiguous — e.g. `auth` handles sign-in, password reset, and sessions in one file, so `authService.list()` wouldn't say what it lists.
 
 **Messages:** generic, reusable text (CRUD success/fail wording, HTTP-generic errors) belongs in `SUCCESS`/`ERRORS` in `shared/constants/message.const.ts` — extend it, don't duplicate. A feature may keep its own `<feature>.const.ts` (e.g. `auth.const.ts`) only for messages specific to that feature's domain (e.g. "Invalid email or password") that wouldn't make sense reused elsewhere. Default to the shared file when in doubt.
 
@@ -199,15 +207,19 @@ import { HttpStatus, SUCCESS } from '@/shared/constants'
 import { createResponse } from '@/shared/utils'
 
 import * as authService from './auth.service'
-import { loginSchema } from './auth.schema'
 
 import type { LoginData } from './auth.type'
+import type { LoginInput } from './auth.schema'
 import type { NextFunction, Request, Response } from 'express'
 
-export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const login = async (
+  req: Request<unknown, unknown, LoginInput>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
-    const credentials = loginSchema.parse(req.body)
-    const data: LoginData = await authService.login(credentials)
+    const { email, password } = req.body
+    const data: LoginData = await authService.login({ email, password })
     const response = createResponse(SUCCESS.AUTH.LOGIN, data)
     res.status(HttpStatus.OK).json(response)
   } catch (error) {
@@ -216,16 +228,20 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 }
 ```
 
+`req.body` is typed straight off `LoginInput` — the type Express's own `Request<Params, ResBody, ReqBody>` generic expects — not parsed again in the controller. Validation already happened at the route (see §7); by the time this function runs, `req.body` is guaranteed to match `LoginInput`.
+
 Routers create a `Router()` and export it as `<feature>Router`:
 
 ```ts
 import { Router } from 'express'
+import { validate } from '@/core/middleware'
 
 import * as authController from './auth.controller'
+import { authSchema } from './auth.schema'
 
 const router = Router()
 
-router.post('/login', authController.login)
+router.post('/login', validate(authSchema.login), authController.login)
 
 export const authRouter = router
 ```
@@ -241,13 +257,19 @@ Follow these steps in order. Skip files you genuinely don't need (e.g. a read-on
 ```ts
 import { z } from 'zod'
 
-export const loginSchema = z.object({
+const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 })
 
+export const authSchema = {
+  login: { body: loginSchema },
+} as const
+
 export type LoginInput = z.infer<typeof loginSchema>
 ```
+
+Group every schema under its action, keyed by the request segment(s) it validates (`body`/`params`/`query` — the `ValidatedShape` type, `core/middleware/validate.type.ts`). An action needing more than one segment lists both, e.g. `update: { body: updateSchema, params: idParamsSchema }`. Export the plain input type(s) (`z.infer<typeof loginSchema>`) next to the schema they're inferred from — that's what the controller types `req` against (§5), one hop away instead of several.
 
 3. **Service** — `auth.service.ts`. Put business logic here, not in the controller. Throw `AppError` for expected failures:
 
@@ -312,24 +334,63 @@ Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is con
 - Feature-specific middleware can live in the feature folder instead.
 - Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route.
 
-### Typed `req` narrowing (`authenticate` + `AuthenticatedRequest`)
+### `validate` — one call per route, keyed by segment
 
-`authenticate` (`core/middleware/authenticate.ts`) verifies the `Authorization: Bearer` access token and sets `req.user` to the decoded payload before calling `next()`; `req.user` is `AccessTokenPayload | undefined` globally (`core/types/express.d.ts`) since most routes aren't authenticated. For a route that _is_ behind `authenticate`, don't re-check `req.user` for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead, type the controller's `req` param as `AuthenticatedRequest` (exported from `authenticate.ts`), which narrows `user` to always-present:
+`validate` (`core/middleware/validate.ts`) takes a single `ValidatedShape` object — `{ body?, params?, query? }`, the same grouping used in `<feature>.schema.ts` (§6 step 2) — and validates every segment present on it in one middleware call, replacing `req.<segment>` with the parsed/transformed data:
 
 ```ts
-export const me = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const data: SafeUser = await authService.getProfile(req.user.sub) // no `?`, no null check
-    ...
+router.post('/sign-in', validate(authSchema.signIn), authController.signIn)
+router.patch(
+  '/:id',
+  authenticate,
+  validate(countrySchema.update), // validates params AND body in one call
+  asHandler(countryController.update)
+)
 ```
 
-Express's `RequestHandler` type can't structurally accept a handler whose `req` is narrower than the base `Request` (its `user` field isn't a generic slot like `body`/`params`/`query`, so Express can't infer it) — wrap the handler with `asHandler` (`shared/utils/handler.util.ts`) at the route registration site to bridge it:
+There's no separate "which segment" argument to pass or forget — the object's own keys (`body`/`params`/`query`) are the source. Don't split one route's validation across multiple `validate(...)` calls; group everything the route needs into one schema entry instead.
+
+### Typing `req`
+
+Type a controller's `req` directly off Express's own `Request<Params, ResBody, ReqBody, ReqQuery>` generic, using the input type(s) exported next to the schema (§6 step 2) — not a hand-written shape, not a generic-inference chain:
+
+```ts
+export const update = async (
+  req: Request<CountryIdParams, unknown, UpdateCountryInput>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { id } = req.params      // typed, not any
+  const { isActive } = req.body  // typed, not any
+  ...
+```
+
+Leave the `ResBody` slot (2nd position) as `unknown` — the response shape is controlled through `createResponse` (§4), not through this generic. Omit a position you don't need (e.g. `Request<unknown, unknown, CreateCountryInput>` for a body-only route, `Request<CountryIdParams>` for a params-only one).
+
+For a route behind `authenticate` (`core/middleware/authenticate.ts`, verifies the `Authorization: Bearer` token and sets `req.user` before calling `next()`) whose handler reads `req.user`: don't re-check it for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead use `AuthenticatedRequest<Params, ResBody, ReqBody, ReqQuery>` (`core/middleware/authenticate.type.ts`) in place of `Request<...>` — same generic positions, plus `user: AccessTokenPayload` guaranteed present (globally it's `AccessTokenPayload | undefined` on `core/types/express.d.ts`, since most routes aren't authenticated):
+
+```ts
+export const changePassword = async (
+  req: AuthenticatedRequest<unknown, unknown, ChangePasswordInput>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { sub: userId } = req.user // no `?`, no null check
+  const { currentPassword, newPassword } = req.body
+  ...
+```
+
+A handler with no body/params to read (e.g. `GET /me`) just uses `AuthenticatedRequest` with no type arguments — every position defaults the same way `Request`'s own generics do.
+
+Express's `RequestHandler` type can't structurally accept a handler whose `req` is narrower than the base `Request` (`user` isn't a generic slot like `body`/`params`/`query`, so Express can't infer it) — wrap the handler with `asHandler` (`shared/utils/handler.util.ts`) at the route registration site to bridge it:
 
 ```ts
 router.get('/me', authenticate, asHandler(authController.me))
 ```
 
 `asHandler` is a generic, dependency-free adapter (`<TReq>(handler) => RequestHandler`) — it belongs in `shared/` because it doesn't know about `AuthenticatedRequest` or any other concrete type; `TReq` is inferred from whatever handler you pass in, so you never need to write the type argument explicitly. Reuse the same `asHandler` for any other middleware that narrows `req` beyond what Express's own generics express — don't write a new one-off adapter per middleware.
+
+**The pairing rule (all three or none):** `authenticate` middleware, `AuthenticatedRequest` typing, and `asHandler` always travel together. A route without `authenticate` never needs `AuthenticatedRequest` or `asHandler` — plain `Request<...>` is both correct and sufficient, even if the handler is otherwise identical in shape (`country`'s `create`/`update`/`remove` are `authenticate`-gated but never read `req.user`, so they stay on plain `Request<...>` with no `asHandler`).
 
 ## 8. Definition of done
 
@@ -402,6 +463,8 @@ fix(logger): prevent metadata from clobbering reserved log fields
 - Before editing any code, list the specific changes you plan to make and wait for explicit go-ahead — don't start editing on your own initiative just because a request implies a code change.
 - Exception: if the user's message already gives the go-ahead ("confirm, go ahead", "fix it", "implement this"), proceed without a separate list-first round.
 - This covers all code changes, not just git actions — see §12 Git workflow below for commit/push-specific rules.
+- **If not explicitly asked for, don't do it — ask first, every time.** This includes actions taken only to "verify" or "try out" an idea (running a script, renaming/moving/deleting a file to simulate some condition, installing something) — not just feature edits. A question ("how do I get X working?") is a request for an answer, not a request to go implement or experiment with X.
+- Never rename, move, or delete a file — even "temporarily," even inside a cleanup/`finally` step — unless the user asked for that specific file to be touched. This happened once already: a local CI-simulation experiment (nobody asked for) deleted `.env.prod`, an untracked, unrecoverable file with real production secrets, via a careless cleanup step. Verify behavior by reading/inspecting or working in a disposable scratch copy, never by modifying real project files and "restoring" them after.
 
 ## 12. Git workflow
 

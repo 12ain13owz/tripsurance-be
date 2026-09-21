@@ -517,7 +517,9 @@ describe('forgotPassword', () => {
     expect(createArgs.data.userId).toBe('user-1')
     expect(createArgs.data.tokenHash).toBe(`hashed-${emailArgs.token}`)
     expect(createArgs.data.expiresAt).toEqual(new Date('2026-08-08T10:30:00.000Z'))
-    expect(emailArgs.resetUrl).toBe(`${env.FRONTEND_URL}/reset-password?token=${emailArgs.token}`)
+    expect(emailArgs.resetUrl).toBe(
+      `${env.FRONTEND_URL}/admin/reset-password?token=${emailArgs.token}`
+    )
     expect(emailArgs.expiresInMinutes).toBe(30)
     expect(sendMailMock).toHaveBeenCalledWith({
       to: 'jane@example.com',

@@ -34,4 +34,7 @@ export const envSchema: z.ZodType<EnvConfig> = z.object({
   RESEND_API_KEY: z.string(),
   RESET_TOKEN_EXPIRES: z.string().regex(durationString),
   FRONTEND_URL: z.url(),
+  STRIPE_SECRET_KEY: z.string(),
+  STRIPE_PUBLISHABLE_KEY: z.string(),
+  STRIPE_WEBHOOK_SECRET: z.string(),
 })

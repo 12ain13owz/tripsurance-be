@@ -10,3 +10,16 @@ services:
       - .env.prod
     ports:
       - '3000:3000'
+
+  stripe-cli:
+    profiles: [stripe]
+    image: stripe/stripe-cli:latest
+    container_name: tripsurance-stripe-cli
+    restart: unless-stopped
+    env_file:
+      - .env.dev
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
+    command: listen --forward-to host.docker.internal:3000/payments/webhook
+    extra_hosts:
+      - host.docker.internal:host-gateway

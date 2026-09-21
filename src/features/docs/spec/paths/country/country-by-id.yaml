@@ -1,0 +1,103 @@
+patch:
+  tags:
+    - Country
+  summary: Update country
+  operationId: updateCountry
+  description: >-
+    Admin only. Currently the only field that can change is isActive —
+    used to toggle whether a country is offered as coverage without
+    deleting its row (isoCode is immutable after creation).
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Country row id (cuid).
+      example: cjld2cjxh0000qzrmn831i7rn
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/update-country-request.schema.yaml'
+  responses:
+    '200':
+      description: Updated country successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/country-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No country with this id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Country not found
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: isActive is missing or not a boolean.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: isActive is required
+            timestamp: '2025-05-29T10:00:00Z'
+delete:
+  tags:
+    - Country
+  summary: Remove country
+  operationId: removeCountry
+  description: >-
+    Admin only. Hard delete — there is no restore. No guard yet against a
+    country that a Plan references (the Plan feature does not exist yet);
+    that guard should land alongside it.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Country row id (cuid).
+      example: cjld2cjxh0000qzrmn831i7rn
+  responses:
+    '200':
+      description: Deleted country successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/message-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No country with this id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Country not found
+            timestamp: '2025-05-29T10:00:00Z'

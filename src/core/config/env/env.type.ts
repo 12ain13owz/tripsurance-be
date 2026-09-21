@@ -20,4 +20,7 @@ export type EnvConfig = {
   RESEND_API_KEY: string
   RESET_TOKEN_EXPIRES: string
   FRONTEND_URL: string
+  STRIPE_SECRET_KEY: string
+  STRIPE_PUBLISHABLE_KEY: string
+  STRIPE_WEBHOOK_SECRET: string
 }
