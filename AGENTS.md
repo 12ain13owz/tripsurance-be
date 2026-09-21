@@ -463,6 +463,8 @@ fix(logger): prevent metadata from clobbering reserved log fields
 - Before editing any code, list the specific changes you plan to make and wait for explicit go-ahead — don't start editing on your own initiative just because a request implies a code change.
 - Exception: if the user's message already gives the go-ahead ("confirm, go ahead", "fix it", "implement this"), proceed without a separate list-first round.
 - This covers all code changes, not just git actions — see §12 Git workflow below for commit/push-specific rules.
+- **If not explicitly asked for, don't do it — ask first, every time.** This includes actions taken only to "verify" or "try out" an idea (running a script, renaming/moving/deleting a file to simulate some condition, installing something) — not just feature edits. A question ("how do I get X working?") is a request for an answer, not a request to go implement or experiment with X.
+- Never rename, move, or delete a file — even "temporarily," even inside a cleanup/`finally` step — unless the user asked for that specific file to be touched. This happened once already: a local CI-simulation experiment (nobody asked for) deleted `.env.prod`, an untracked, unrecoverable file with real production secrets, via a careless cleanup step. Verify behavior by reading/inspecting or working in a disposable scratch copy, never by modifying real project files and "restoring" them after.
 
 ## 12. Git workflow
 
