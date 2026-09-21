@@ -1,0 +1,24 @@
+type: object
+description: >-
+  A country available as travel-insurance coverage. isoCode is the unique,
+  stable identifier — id is only for internal reference.
+properties:
+  id:
+    type: string
+    example: cjld2cjxh0000qzrmn831i7rn
+  isoCode:
+    type: string
+    description: ISO 3166-1 alpha-2 code, always uppercase.
+    example: JP
+  isActive:
+    type: boolean
+    description: Whether this country is currently offered as coverage.
+    example: true
+  createdAt:
+    type: string
+    format: date-time
+    example: '2025-05-29T07:28:04.886Z'
+  updatedAt:
+    type: string
+    format: date-time
+    example: '2025-05-29T07:28:04.886Z'

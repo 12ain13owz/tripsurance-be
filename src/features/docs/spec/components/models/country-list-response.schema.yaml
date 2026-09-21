@@ -1,0 +1,13 @@
+type: object
+properties:
+  message:
+    type: string
+    example: Listed country successfully
+  timestamp:
+    type: string
+    format: date-time
+    example: '2025-05-29T10:00:00Z'
+  data:
+    type: array
+    items:
+      $ref: './country.schema.yaml'

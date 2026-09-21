@@ -12,6 +12,8 @@ tags:
     description: Service health checks
   - name: Auth
     description: Authentication
+  - name: Country
+    description: Countries available as travel-insurance coverage
 
 paths:
   /health:
@@ -36,6 +38,10 @@ paths:
     $ref: './paths/auth/sessions.yaml'
   /auth/sessions/{id}:
     $ref: './paths/auth/session-by-id.yaml'
+  /countries:
+    $ref: './paths/country/countries.yaml'
+  /countries/{id}:
+    $ref: './paths/country/country-by-id.yaml'
 
 components:
   securitySchemes:
@@ -71,6 +77,16 @@ components:
       $ref: './components/models/session-summary.schema.yaml'
     SessionListResponse:
       $ref: './components/models/session-list-response.schema.yaml'
+    Country:
+      $ref: './components/models/country.schema.yaml'
+    CountryListResponse:
+      $ref: './components/models/country-list-response.schema.yaml'
+    CountryResponse:
+      $ref: './components/models/country-response.schema.yaml'
+    CreateCountryRequest:
+      $ref: './components/models/create-country-request.schema.yaml'
+    UpdateCountryRequest:
+      $ref: './components/models/update-country-request.schema.yaml'
   responses:
     SuccessResponse:
       $ref: './components/responses/success.response.yaml'
