@@ -16,8 +16,12 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/health",
-              "host": ["{{base_url}}"],
-              "path": ["health"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           },
           "response": []
@@ -29,8 +33,13 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/health/error",
-              "host": ["{{base_url}}"],
-              "path": ["health", "error"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "error"
+              ]
             }
           },
           "response": []
@@ -73,8 +82,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/sign-in",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "sign-in"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "sign-in"
+              ]
             }
           },
           "response": []
@@ -85,7 +99,9 @@
             {
               "listen": "test",
               "script": {
-                "exec": ["pm.collectionVariables.set('accessToken', '')"],
+                "exec": [
+                  "pm.collectionVariables.set('accessToken', '')"
+                ],
                 "type": "text/javascript",
                 "packages": {},
                 "requests": {}
@@ -106,8 +122,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/sign-out",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "sign-out"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "sign-out"
+              ]
             }
           },
           "response": []
@@ -128,8 +149,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/refresh",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "refresh"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
             }
           },
           "response": []
@@ -163,8 +189,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/me",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
             }
           },
           "response": []
@@ -195,8 +226,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/change-password",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "change-password"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
             }
           },
           "response": []
@@ -227,8 +263,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/forgot-password",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "forgot-password"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
             }
           },
           "response": []
@@ -250,7 +291,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n    \"token\": \"7c5f6b42b202fb242b2a159d2e737d3184e3ee0d2ea17f38dea9bda77861f55d\",\r\n    \"newPassword\": \"!Qwer12345\",\r\n    \"confirmPassword\": \"!Qwer12345\"\r\n}",
+              "raw": "{\r\n    \"token\": \"d7fe6baf1f5903c7527396d99c84eed5d986cc300d6365b36dfb1232c69fd79e\",\r\n    \"newPassword\": \"!Qwer1234\",\r\n    \"confirmPassword\": \"!Qwer1234\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -259,14 +300,19 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/reset-password",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "reset-password"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
             }
           },
           "response": []
         },
         {
-          "name": "List Session",
+          "name": "List Sessions",
           "protocolProfileBehavior": {
             "disableBodyPruning": true
           },
@@ -294,8 +340,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/sessions",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "sessions"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "sessions"
+              ]
             }
           },
           "response": []
@@ -326,14 +377,20 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/sessions/cmslhaiv100019wfgwa5k78ea",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "sessions", "cmslhaiv100019wfgwa5k78ea"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "sessions",
+                "cmslhaiv100019wfgwa5k78ea"
+              ]
             }
           },
           "response": []
         },
         {
-          "name": "Sigh out other devices",
+          "name": "Sign out other devices",
           "request": {
             "auth": {
               "type": "bearer",
@@ -358,8 +415,154 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/sessions",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "sessions"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "sessions"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Country",
+      "item": [
+        {
+          "name": "List Countries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/countries",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "countries"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Country",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"isoCode\": \"ZC\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/countries",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "countries"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Country",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"isActive\": false\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/countries/cmuaywdsp0002ckfgr54k3fhk",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "countries",
+                "cmuaywdsp0002ckfgr54k3fhk"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Country",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/countries/cmuaywhwc0003ckfgdxgyqgj7",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "countries",
+                "cmuaywhwc0003ckfgdxgyqgj7"
+              ]
             }
           },
           "response": []
@@ -374,7 +577,9 @@
         "type": "text/javascript",
         "packages": {},
         "requests": {},
-        "exec": [""]
+        "exec": [
+          ""
+        ]
       }
     },
     {
@@ -383,7 +588,9 @@
         "type": "text/javascript",
         "packages": {},
         "requests": {},
-        "exec": [""]
+        "exec": [
+          ""
+        ]
       }
     }
   ],
