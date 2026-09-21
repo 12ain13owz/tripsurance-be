@@ -26,5 +26,8 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Setup env files
+        run: npm run setup-env
+
       - name: Test
         run: npm test
