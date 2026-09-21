@@ -70,3 +70,9 @@ export const authSchema = {
   resetPassword: { body: resetPasswordSchema },
   revokeSession: { params: revokeSessionSchema },
 } as const
+
+export type SignInInput = z.infer<typeof signInSchema>
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
+export type RevokeSessionInput = z.infer<typeof revokeSessionSchema>

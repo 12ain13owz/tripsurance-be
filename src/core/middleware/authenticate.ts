@@ -1,12 +1,9 @@
 import { AppError } from '@/core/error'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { verifyAccessToken } from '../security'
-import type { AccessTokenPayload } from '../security'
 import type { Request, Response, NextFunction } from 'express'
 
 const BEARER_PREFIX = 'Bearer '
-
-export type AuthenticatedRequest<TReq = Request> = TReq & { user: AccessTokenPayload }
 
 export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
   try {

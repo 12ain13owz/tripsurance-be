@@ -25,7 +25,7 @@ describe('validate', () => {
     const schema = z.object({ email: z.string().trim().toLowerCase() })
     const req = makeReq({ body: { email: '  JANE@Example.com  ' } })
 
-    validate(schema)(req, {} as Response, next)
+    validate({ body: schema })(req, {} as Response, next)
     expect(next).toHaveBeenCalledWith()
     expect(req.body).toEqual({ email: 'jane@example.com' })
   })
@@ -37,7 +37,7 @@ describe('validate', () => {
     })
     const req = makeReq({ body: { password: 'short' } })
 
-    validate(schema)(req, {} as Response, next)
+    validate({ body: schema })(req, {} as Response, next)
     expect(next).toHaveBeenCalledTimes(1)
 
     const [error] = next.mock.calls[0] as [AppError]
@@ -53,7 +53,7 @@ describe('validate', () => {
     const original = { password: 'short' }
     const req = makeReq({ body: original })
 
-    validate(schema)(req, {} as Response, next)
+    validate({ body: schema })(req, {} as Response, next)
     expect(req.body).toBe(original)
   })
 
@@ -61,7 +61,7 @@ describe('validate', () => {
     const schema = z.object({ id: z.coerce.number() })
     const req = makeReq({ params: { id: '42' } })
 
-    validate(schema, 'params')(req, {} as Response, next)
+    validate({ params: schema })(req, {} as Response, next)
     expect(req.params).toEqual({ id: 42 })
     expect(next).toHaveBeenCalledWith()
   })
@@ -70,7 +70,7 @@ describe('validate', () => {
     const schema = z.object({ page: z.coerce.number() })
     const req = makeReq({ query: { page: '2' } })
 
-    validate(schema, 'query')(req, {} as Response, next)
+    validate({ query: schema })(req, {} as Response, next)
     expect(req.query).toEqual({ page: 2 })
     expect(next).toHaveBeenCalledWith()
   })
