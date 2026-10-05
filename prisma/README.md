@@ -15,10 +15,9 @@ comfortable with code but new to Prisma.
 ```bash
 npm install
 npm run setup-env          # creates .env.dev (+ .env.prod) from .env.example
-# edit DATABASE_URL in .env.dev to point at a running Postgres instance
-# (docker-compose.yml here only runs the app itself, not a DB — have Postgres running separately)
-npm run db:deploy          # apply every existing migration onto the empty DB
 npm run db:generate        # deploy doesn't auto-generate — this step is required
+npm run db:start           # start the Postgres container (docker-compose.yml); default DATABASE_URL already matches
+npm run db:deploy          # apply every existing migration onto the empty DB
 npm run db:seed            # insert the seed accounts (login test users, see prisma/seeds/user.ts)
 npm run dev
 ```
@@ -32,10 +31,9 @@ migrations that already exist, which is exactly what `deploy` does non-interacti
 ```bash
 npm install
 npm run setup-env          # สร้าง .env.dev (+ .env.prod) จาก .env.example
-# แก้ DATABASE_URL ใน .env.dev ให้ชี้ไปที่ Postgres ที่รันอยู่
-# (docker-compose.yml ในนี้มีแค่ตัวแอป ไม่มี Postgres service ให้ ต้องมี DB รันแยกเอง)
-npm run db:deploy          # apply migration ที่มีอยู่แล้วทั้งหมดลง DB เปล่า
 npm run db:generate        # deploy ไม่ auto-generate ให้ ต้องรันเองจุดนี้
+npm run db:start           # เปิด Postgres container (docker-compose.yml) — DATABASE_URL default ตรงกันอยู่แล้ว
+npm run db:deploy          # apply migration ที่มีอยู่แล้วทั้งหมดลง DB เปล่า
 npm run db:seed            # ใส่ seed account ไว้ test login (ดู prisma/seeds/user.ts)
 npm run dev
 ```

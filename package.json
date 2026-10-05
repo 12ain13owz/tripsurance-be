@@ -27,6 +27,9 @@
     "db:reset": "tsx scripts/prisma-env.ts migrate reset",
     "db:seed": "tsx scripts/prisma-env.ts db seed",
     "db:seed:prod": "tsx scripts/prisma-env.ts --env-file=.env.prod db seed",
+    "db:start": "docker compose up -d --wait postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:logs": "docker compose logs -f postgres",
     "stripe:listen": "docker compose --env-file .env.dev --profile stripe up stripe-cli"
   },
   "scripts-info": {
@@ -47,6 +50,9 @@
     "db:studio": "Opens Prisma Studio, a local GUI for browsing and editing DB data.",
     "db:reset": "Drops the DB, re-applies all migrations from scratch, and re-runs the seed.",
     "db:seed": "Runs prisma/seed.ts to insert baseline test data (e.g. login test accounts).",
+    "db:start": "Starts the local Postgres container (docker-compose.yml) and waits until it accepts connections.",
+    "db:stop": "Stops the local Postgres container; data stays in the db-postgres-data volume.",
+    "db:logs": "Tails the local Postgres container logs.",
     "stripe:listen": "Forwards Stripe webhooks to localhost:3000/payments/webhook via the stripe-cli Docker profile. Copy the printed whsec_... into STRIPE_WEBHOOK_SECRET in .env.dev, then restart npm run dev."
   },
   "keywords": [
