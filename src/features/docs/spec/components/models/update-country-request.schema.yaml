@@ -1,7 +1,15 @@
 type: object
-required:
-  - isActive
+description: >-
+  Both fields are optional, but at least one of isoCode or isActive must be
+  provided.
+minProperties: 1
 properties:
+  isoCode:
+    type: string
+    description: >-
+      ISO 3166-1 alpha-2 code. Trimmed and uppercased before validation, so
+      lowercase input is accepted. Must not already belong to another country.
+    example: th
   isActive:
     type: boolean
     example: false
