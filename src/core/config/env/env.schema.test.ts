@@ -32,7 +32,16 @@ describe('envSchema', () => {
     if (result.success) {
       expect(result.data.PORT).toBe(3000)
       expect(result.data.SHUTDOWN_TIMEOUT_MS).toBe(10_000)
+      expect(result.data.LOG_SILENT).toBe(false)
     }
+  })
+
+  it('parses LOG_SILENT as a boolean string', () => {
+    const silent = envSchema.safeParse({ ...validEnv, LOG_SILENT: 'true' })
+    const loud = envSchema.safeParse({ ...validEnv, LOG_SILENT: 'false' })
+
+    expect(silent.success && silent.data.LOG_SILENT).toBe(true)
+    expect(loud.success && loud.data.LOG_SILENT).toBe(false)
   })
 
   it('rejects a PORT outside the valid range', () => {

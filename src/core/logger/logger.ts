@@ -54,9 +54,15 @@ const baseLogger = createLogger({
     new transports.Console({
       format: consoleLogFormat,
       level: env.LOG_LEVEL_CONSOLE,
+      silent: env.LOG_SILENT,
     }),
-    createFileTransport(env.LOG_LEVEL_FILE, jsonFileFormat),
-    createFileTransport(env.LOG_LEVEL_ERROR_FILE, jsonFileFormat, true),
+    // Skipped entirely when silent so no logs/ directory or file is created (e.g. under tests).
+    ...(env.LOG_SILENT
+      ? []
+      : [
+          createFileTransport(env.LOG_LEVEL_FILE, jsonFileFormat),
+          createFileTransport(env.LOG_LEVEL_ERROR_FILE, jsonFileFormat, true),
+        ]),
   ],
 })
 
