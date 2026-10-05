@@ -38,7 +38,9 @@ export const update = async (
 ): Promise<void> => {
   try {
     const { id } = req.params
-    const data: Country = await countryService.update(id, req.body)
+    const { isActive } = req.body
+
+    const data: Country = await countryService.update(id, isActive)
     const response = createResponse(SUCCESS.UTIL.update('country'), data)
 
     res.status(HttpStatus.OK).json(response)

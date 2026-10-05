@@ -4,25 +4,18 @@ import { ERRORS } from '@/shared/constants'
 
 const ISO_CODE_REGEX = /^[A-Z]{2}$/
 
-const isoCodeSchema = z
-  .string({ error: ERRORS.UTIL.requiredField('ISO Code') })
-  .trim()
-  .toUpperCase()
-  .regex(ISO_CODE_REGEX, ERRORS.UTIL.invalidField('ISO code'))
-  .refine((code) => countries.isValid(code), { message: ERRORS.UTIL.invalidField('ISO code') })
-
 const createSchema = z.object({
-  isoCode: isoCodeSchema,
+  isoCode: z
+    .string({ error: ERRORS.UTIL.requiredField('ISO Code') })
+    .trim()
+    .toUpperCase()
+    .regex(ISO_CODE_REGEX, ERRORS.UTIL.invalidField('ISO code'))
+    .refine((code) => countries.isValid(code), { message: ERRORS.UTIL.invalidField('ISO code') }),
 })
 
-const updateSchema = z
-  .object({
-    isoCode: isoCodeSchema.optional(),
-    isActive: z.boolean().optional(),
-  })
-  .refine((data) => data.isoCode !== undefined || data.isActive !== undefined, {
-    message: ERRORS.UTIL.requiredField('isoCode or isActive'),
-  })
+const updateSchema = z.object({
+  isActive: z.boolean({ error: ERRORS.UTIL.requiredField('isActive') }),
+})
 
 const idParamsSchema = z.object({
   id: z.string({ error: ERRORS.UTIL.requiredField('Country id') }),
