@@ -22,7 +22,7 @@ export const create = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { isoCode } = req.body // typed เป็น string จริง ไม่ใช่ any
+    const { isoCode } = req.body
     const data: Country = await countryService.create(isoCode)
     const response = createResponse(SUCCESS.UTIL.create('country'), data)
     res.status(HttpStatus.CREATED).json(response)
@@ -38,9 +38,7 @@ export const update = async (
 ): Promise<void> => {
   try {
     const { id } = req.params
-    const { isActive } = req.body
-
-    const data: Country = await countryService.update(id, isActive)
+    const data: Country = await countryService.update(id, req.body)
     const response = createResponse(SUCCESS.UTIL.update('country'), data)
 
     res.status(HttpStatus.OK).json(response)
