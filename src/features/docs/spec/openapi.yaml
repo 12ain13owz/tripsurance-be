@@ -40,7 +40,9 @@ paths:
     $ref: './paths/auth/session-by-id.yaml'
   /countries:
     $ref: './paths/country/countries.yaml'
-  /countries/{id}:
+  /admin/countries:
+    $ref: './paths/country/admin-countries.yaml'
+  /admin/countries/{id}:
     $ref: './paths/country/country-by-id.yaml'
 
 components:
