@@ -246,16 +246,13 @@ router.post('/login', validate(authSchema.login), authController.login)
 export const authRouter = router
 ```
 
-When a feature needs **more than one router** — typically a public (consumer) router plus an admin router for the same resource — don't keep the local `router` name. Declare each router with its exported name, `<feature><Audience>Router`, so one name refers to one router across the codebase (see `country.routes.ts`):
+When a feature needs **more than one router** — typically a public (consumer) router plus an admin router for the same resource — don't keep the local `router` name. Declare each router with its exported name, `<feature><Audience>Router`, so one name refers to one router across the codebase. Declare all routers first, then each router's routes as its own block (see `country.routes.ts`; `src/routes.ts` follows the same shape for `publicRoutes`/`adminRoutes`):
 
 ```ts
-// Public (consumer): only countries currently offered as coverage
 export const countryPublicRouter = Router()
+export const countryAdminRouter = Router()
 
 countryPublicRouter.get('/', countryController.listActive)
-
-// Admin: mounted in adminRoutes, which applies authenticate to every route (see src/routes.ts)
-export const countryAdminRouter = Router()
 
 countryAdminRouter.get('/', countryController.list)
 countryAdminRouter.patch('/:id', validate(countrySchema.update), countryController.update)
