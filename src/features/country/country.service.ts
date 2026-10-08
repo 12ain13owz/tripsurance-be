@@ -34,6 +34,14 @@ export const list = async (): Promise<Country[]> => {
   return countries
 }
 
+export const listActive = async (): Promise<Country[]> => {
+  const countries = await wrapUnexpected(
+    async () => prisma.country.findMany({ where: { isActive: true }, orderBy: { isoCode: 'asc' } }),
+    { operation: 'listActiveCountry' }
+  )
+  return countries
+}
+
 export const create = async (isoCode: string): Promise<Country> => {
   const existing = await wrapUnexpected(
     async () => prisma.country.findUnique({ where: { isoCode } }),

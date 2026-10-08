@@ -7,12 +7,14 @@ import { ERRORS, ErrorSeverity, HttpStatus, SUCCESS } from '@/shared/constants'
 import type { AppResponse } from '@/shared/types'
 
 const listMock = vi.fn<() => Promise<Country[]>>()
+const listActiveMock = vi.fn<() => Promise<Country[]>>()
 const createMock = vi.fn<(isoCode: string) => Promise<Country>>()
 const updateMock = vi.fn<(id: string, isActive: boolean) => Promise<Country>>()
 const removeMock = vi.fn<(id: string) => Promise<Country>>()
 
 vi.mock('./country.service', () => ({
   list: async () => listMock(),
+  listActive: async () => listActiveMock(),
   create: async (isoCode: string) => createMock(isoCode),
   update: async (id: string, isActive: boolean) => updateMock(id, isActive),
   remove: async (id: string) => removeMock(id),
@@ -32,10 +34,18 @@ const country: Country = {
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 }
+const inactiveCountry: Country = { ...country, id: 'country-2', isoCode: 'KP', isActive: false }
 const authHeader = ['Authorization', 'Bearer access-token'] as const
+
+const toJson = (c: Country) => ({
+  ...c,
+  createdAt: c.createdAt.toISOString(),
+  updatedAt: c.updatedAt.toISOString(),
+})
 
 beforeEach(() => {
   listMock.mockReset()
+  listActiveMock.mockReset()
   createMock.mockReset()
   updateMock.mockReset()
   removeMock.mockReset()
@@ -43,38 +53,79 @@ beforeEach(() => {
 })
 
 describe('GET /countries', () => {
-  it('returns 200 with the country list and requires no auth', async () => {
-    listMock.mockResolvedValue([country])
+  it('returns 200 with active countries only and requires no auth', async () => {
+    listActiveMock.mockResolvedValue([country])
 
     const res = await request(app).get('/countries')
     const body = res.body as AppResponse<Country[]>
 
     expect(res.status).toBe(HttpStatus.OK)
     expect(body.message).toBe(SUCCESS.UTIL.list('country'))
-    expect(body.data).toEqual([
-      {
-        ...country,
-        createdAt: country.createdAt.toISOString(),
-        updatedAt: country.updatedAt.toISOString(),
-      },
-    ])
+    expect(body.data).toEqual([toJson(country)])
+    expect(listMock).not.toHaveBeenCalled()
+  })
+
+  it('forwards a service AppError to the error handler', async () => {
+    listActiveMock.mockRejectedValue(new AppError('boom', HttpStatus.INTERNAL_SERVER_ERROR))
+
+    const res = await request(app).get('/countries')
+
+    expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(listActiveMock).toHaveBeenCalled()
+  })
+
+  it('does not expose admin actions on the public path, even with a bearer token', async () => {
+    const res = await request(app)
+      .patch('/countries/country-1')
+      .set(...authHeader)
+      .send({ isActive: false })
+
+    expect(res.status).toBe(HttpStatus.NOT_FOUND)
+    expect(updateMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /admin/countries', () => {
+  it('returns 200 with every country, active or not, on a valid bearer token', async () => {
+    listMock.mockResolvedValue([country, inactiveCountry])
+
+    const res = await request(app)
+      .get('/admin/countries')
+      .set(...authHeader)
+    const body = res.body as AppResponse<Country[]>
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(SUCCESS.UTIL.list('country'))
+    expect(body.data).toEqual([toJson(country), toJson(inactiveCountry)])
+    expect(listActiveMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 401 and never calls the service when there is no Authorization header', async () => {
+    const res = await request(app).get('/admin/countries')
+    const body = res.body as AppResponse<undefined>
+
+    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
+    expect(listMock).not.toHaveBeenCalled()
   })
 
   it('forwards a service AppError to the error handler', async () => {
     listMock.mockRejectedValue(new AppError('boom', HttpStatus.INTERNAL_SERVER_ERROR))
 
-    const res = await request(app).get('/countries')
+    const res = await request(app)
+      .get('/admin/countries')
+      .set(...authHeader)
+
     expect(res.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR)
-    expect(listMock).toHaveBeenCalled()
   })
 })
 
-describe('POST /countries', () => {
+describe('POST /admin/countries', () => {
   it('returns 201 with the created country on a valid body and bearer token', async () => {
     createMock.mockResolvedValue(country)
 
     const res = await request(app)
-      .post('/countries')
+      .post('/admin/countries')
       .set(...authHeader)
       .send({ isoCode: 'jp' })
     const body = res.body as AppResponse<Country>
@@ -85,7 +136,7 @@ describe('POST /countries', () => {
   })
 
   it('returns 401 and never calls the service when there is no Authorization header', async () => {
-    const res = await request(app).post('/countries').send({ isoCode: 'JP' })
+    const res = await request(app).post('/admin/countries').send({ isoCode: 'JP' })
     const body = res.body as AppResponse<undefined>
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
@@ -95,7 +146,7 @@ describe('POST /countries', () => {
 
   it('returns 422 and never calls the service when isoCode is not a 2-letter code', async () => {
     const res = await request(app)
-      .post('/countries')
+      .post('/admin/countries')
       .set(...authHeader)
       .send({ isoCode: 'JPN' })
 
@@ -109,7 +160,7 @@ describe('POST /countries', () => {
     )
 
     const res = await request(app)
-      .post('/countries')
+      .post('/admin/countries')
       .set(...authHeader)
       .send({ isoCode: 'JP' })
     const body = res.body as AppResponse<undefined>
@@ -119,12 +170,12 @@ describe('POST /countries', () => {
   })
 })
 
-describe('PATCH /countries/:id', () => {
+describe('PATCH /admin/countries/:id', () => {
   it('returns 200 with the updated country on a valid body, params, and bearer token', async () => {
     updateMock.mockResolvedValue({ ...country, isActive: false })
 
     const res = await request(app)
-      .patch('/countries/country-1')
+      .patch('/admin/countries/country-1')
       .set(...authHeader)
       .send({ isActive: false })
     const body = res.body as AppResponse<Country>
@@ -135,7 +186,7 @@ describe('PATCH /countries/:id', () => {
   })
 
   it('returns 401 and never calls the service when there is no Authorization header', async () => {
-    const res = await request(app).patch('/countries/country-1').send({ isActive: false })
+    const res = await request(app).patch('/admin/countries/country-1').send({ isActive: false })
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
     expect(updateMock).not.toHaveBeenCalled()
@@ -143,7 +194,7 @@ describe('PATCH /countries/:id', () => {
 
   it('returns 422 and never calls the service when isActive is missing', async () => {
     const res = await request(app)
-      .patch('/countries/country-1')
+      .patch('/admin/countries/country-1')
       .set(...authHeader)
       .send({})
 
@@ -157,7 +208,7 @@ describe('PATCH /countries/:id', () => {
     )
 
     const res = await request(app)
-      .patch('/countries/missing-id')
+      .patch('/admin/countries/missing-id')
       .set(...authHeader)
       .send({ isActive: false })
     const body = res.body as AppResponse<undefined>
@@ -167,12 +218,12 @@ describe('PATCH /countries/:id', () => {
   })
 })
 
-describe('DELETE /countries/:id', () => {
+describe('DELETE /admin/countries/:id', () => {
   it('returns 200 and calls the service with the id on a valid bearer token', async () => {
     removeMock.mockResolvedValue(country)
 
     const res = await request(app)
-      .delete('/countries/country-1')
+      .delete('/admin/countries/country-1')
       .set(...authHeader)
     const body = res.body as AppResponse<undefined>
 
@@ -182,7 +233,7 @@ describe('DELETE /countries/:id', () => {
   })
 
   it('returns 401 and never calls the service when there is no Authorization header', async () => {
-    const res = await request(app).delete('/countries/country-1')
+    const res = await request(app).delete('/admin/countries/country-1')
 
     expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
     expect(removeMock).not.toHaveBeenCalled()
@@ -194,7 +245,7 @@ describe('DELETE /countries/:id', () => {
     )
 
     const res = await request(app)
-      .delete('/countries/missing-id')
+      .delete('/admin/countries/missing-id')
       .set(...authHeader)
     const body = res.body as AppResponse<undefined>
 

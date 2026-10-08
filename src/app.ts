@@ -5,7 +5,7 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import { corsOptions, helmetOptions, rateLimitOptions } from '@/core/config'
 import { errorHandler } from '@/core/error'
-import { mainRoutes } from '@/routes'
+import { adminRoutes, publicRoutes } from '@/routes'
 import type { Express } from 'express'
 
 export const createApp = (): Express => {
@@ -17,7 +17,8 @@ export const createApp = (): Express => {
   app.use(morgan('dev'))
   app.use(express.json())
 
-  app.use(mainRoutes)
+  app.use(publicRoutes)
+  app.use('/admin', adminRoutes)
   app.use(errorHandler)
 
   return app

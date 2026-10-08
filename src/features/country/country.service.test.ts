@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/error'
 import type { Country } from '@/generated/prisma/client'
 import { ERRORS, HttpStatus } from '@/shared/constants'
-import { create, list, remove, update } from './country.service'
+import { create, list, listActive, remove, update } from './country.service'
 
-const findManyMock = vi.fn<(args: { orderBy: { isoCode: 'asc' } }) => Promise<Country[]>>()
+interface FindManyArgs {
+  where?: { isActive: boolean }
+  orderBy: { isoCode: 'asc' }
+}
+
+const findManyMock = vi.fn<(args: FindManyArgs) => Promise<Country[]>>()
 const findUniqueMock =
   vi.fn<(args: { where: { id: string } | { isoCode: string } }) => Promise<Country | null>>()
 const createMock = vi.fn<(args: { data: { isoCode: string } }) => Promise<Country>>()
@@ -15,7 +20,7 @@ const deleteMock = vi.fn<(args: { where: { id: string } }) => Promise<Country>>(
 vi.mock('@/core/database/prisma', () => ({
   prisma: {
     country: {
-      findMany: async (args: { orderBy: { isoCode: 'asc' } }) => findManyMock(args),
+      findMany: async (args: FindManyArgs) => findManyMock(args),
       findUnique: async (args: { where: { id: string } | { isoCode: string } }) =>
         findUniqueMock(args),
       create: async (args: { data: { isoCode: string } }) => createMock(args),
@@ -56,6 +61,29 @@ describe('list', () => {
     findManyMock.mockRejectedValue(new Error('connection refused'))
 
     await expect(list()).rejects.toMatchObject({
+      message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    })
+  })
+})
+
+describe('listActive', () => {
+  it('returns only active countries ordered by isoCode ascending', async () => {
+    findManyMock.mockResolvedValue([country])
+
+    const result = await listActive()
+
+    expect(result).toEqual([country])
+    expect(findManyMock).toHaveBeenCalledWith({
+      where: { isActive: true },
+      orderBy: { isoCode: 'asc' },
+    })
+  })
+
+  it('wraps an unexpected database error as a 500 AppError', async () => {
+    findManyMock.mockRejectedValue(new Error('connection refused'))
+
+    await expect(listActive()).rejects.toMatchObject({
       message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
       status: HttpStatus.INTERNAL_SERVER_ERROR,
     })

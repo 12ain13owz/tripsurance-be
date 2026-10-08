@@ -16,6 +16,21 @@ export const list = async (_req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
+export const listActive = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data: Country[] = await countryService.listActive()
+    const response = createResponse(SUCCESS.UTIL.list('country'), data)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const create = async (
   req: Request<unknown, unknown, CreateCountryInput>,
   res: Response,
