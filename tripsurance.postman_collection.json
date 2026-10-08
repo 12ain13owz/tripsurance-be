@@ -415,38 +415,6 @@
           "response": []
         },
         {
-          "name": "Create Country",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n    \"isoCode\": \"ZC\"\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/countries",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "countries"]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Update Country",
           "request": {
             "auth": {
@@ -474,38 +442,6 @@
               "raw": "{{base_url}}/admin/countries/cmuaywdsp0002ckfgr54k3fhk",
               "host": ["{{base_url}}"],
               "path": ["admin", "countries", "cmuaywdsp0002ckfgr54k3fhk"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Delete Country",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "DELETE",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/countries/cmuaywhwc0003ckfgdxgyqgj7",
-              "host": ["{{base_url}}"],
-              "path": ["admin", "countries", "cmuaywhwc0003ckfgdxgyqgj7"]
             }
           },
           "response": []

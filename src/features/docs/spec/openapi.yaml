@@ -85,8 +85,6 @@ components:
       $ref: './components/models/country-list-response.schema.yaml'
     CountryResponse:
       $ref: './components/models/country-response.schema.yaml'
-    CreateCountryRequest:
-      $ref: './components/models/create-country-request.schema.yaml'
     UpdateCountryRequest:
       $ref: './components/models/update-country-request.schema.yaml'
   responses:

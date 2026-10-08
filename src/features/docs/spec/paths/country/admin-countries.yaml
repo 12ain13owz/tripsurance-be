@@ -6,7 +6,8 @@ get:
   description: >-
     Admin only. Returns every country regardless of isActive, ordered by
     isoCode ascending. Consumers use GET /countries, which returns active
-    countries only.
+    countries only. There is no create endpoint — countries come from the
+    ISO 3166-1 seed (`prisma/seeds/country.ts`).
   security:
     - bearerAuth: []
   responses:
@@ -24,55 +25,4 @@ get:
             $ref: '../../components/models/error.schema.yaml'
           example:
             message: Authentication required
-            timestamp: '2025-05-29T10:00:00Z'
-post:
-  tags:
-    - Country
-  summary: Create country
-  operationId: createCountry
-  description: >-
-    Admin only. isoCode is trimmed and uppercased before validation, so
-    lowercase input is accepted. Fails with 409 if the (uppercased) isoCode
-    already exists — isoCode is unique.
-  security:
-    - bearerAuth: []
-  requestBody:
-    required: true
-    content:
-      application/json:
-        schema:
-          $ref: '../../components/models/create-country-request.schema.yaml'
-  responses:
-    '201':
-      description: Created country successfully
-      content:
-        application/json:
-          schema:
-            $ref: '../../components/models/country-response.schema.yaml'
-    '401':
-      description: No Authorization header, or the bearer token is invalid/expired.
-      content:
-        application/json:
-          schema:
-            $ref: '../../components/models/error.schema.yaml'
-          example:
-            message: Authentication required
-            timestamp: '2025-05-29T10:00:00Z'
-    '409':
-      description: A country with this isoCode already exists.
-      content:
-        application/json:
-          schema:
-            $ref: '../../components/models/error.schema.yaml'
-          example:
-            message: Country already exists
-            timestamp: '2025-05-29T10:00:00Z'
-    '422':
-      description: isoCode is missing or not a 2-letter code.
-      content:
-        application/json:
-          schema:
-            $ref: '../../components/models/error.schema.yaml'
-          example:
-            message: Invalid ISO code format
             timestamp: '2025-05-29T10:00:00Z'

@@ -8,16 +8,12 @@ import type { AppResponse } from '@/shared/types'
 
 const listMock = vi.fn<() => Promise<Country[]>>()
 const listActiveMock = vi.fn<() => Promise<Country[]>>()
-const createMock = vi.fn<(isoCode: string) => Promise<Country>>()
 const updateMock = vi.fn<(id: string, isActive: boolean) => Promise<Country>>()
-const removeMock = vi.fn<(id: string) => Promise<Country>>()
 
 vi.mock('./country.service', () => ({
   list: async () => listMock(),
   listActive: async () => listActiveMock(),
-  create: async (isoCode: string) => createMock(isoCode),
   update: async (id: string, isActive: boolean) => updateMock(id, isActive),
-  remove: async (id: string) => removeMock(id),
 }))
 
 const verifyAccessTokenMock = vi.fn<(token: string) => { sub: string; iat: number; exp: number }>()
@@ -46,9 +42,7 @@ const toJson = (c: Country) => ({
 beforeEach(() => {
   listMock.mockReset()
   listActiveMock.mockReset()
-  createMock.mockReset()
   updateMock.mockReset()
-  removeMock.mockReset()
   verifyAccessTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
 })
 
@@ -120,56 +114,6 @@ describe('GET /admin/countries', () => {
   })
 })
 
-describe('POST /admin/countries', () => {
-  it('returns 201 with the created country on a valid body and bearer token', async () => {
-    createMock.mockResolvedValue(country)
-
-    const res = await request(app)
-      .post('/admin/countries')
-      .set(...authHeader)
-      .send({ isoCode: 'jp' })
-    const body = res.body as AppResponse<Country>
-
-    expect(res.status).toBe(HttpStatus.CREATED)
-    expect(body.message).toBe(SUCCESS.UTIL.create('country'))
-    expect(createMock).toHaveBeenCalledWith('JP')
-  })
-
-  it('returns 401 and never calls the service when there is no Authorization header', async () => {
-    const res = await request(app).post('/admin/countries').send({ isoCode: 'JP' })
-    const body = res.body as AppResponse<undefined>
-
-    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
-    expect(body.message).toBe(ERRORS.AUTH.MISSING_TOKEN)
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('returns 422 and never calls the service when isoCode is not a 2-letter code', async () => {
-    const res = await request(app)
-      .post('/admin/countries')
-      .set(...authHeader)
-      .send({ isoCode: 'JPN' })
-
-    expect(res.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY)
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('forwards a service AppError (e.g. already exists) to the error handler', async () => {
-    createMock.mockRejectedValue(
-      new AppError(ERRORS.UTIL.alreadyExists('Country'), HttpStatus.CONFLICT, ErrorSeverity.WARN)
-    )
-
-    const res = await request(app)
-      .post('/admin/countries')
-      .set(...authHeader)
-      .send({ isoCode: 'JP' })
-    const body = res.body as AppResponse<undefined>
-
-    expect(res.status).toBe(HttpStatus.CONFLICT)
-    expect(body.message).toBe(ERRORS.UTIL.alreadyExists('Country'))
-  })
-})
-
 describe('PATCH /admin/countries/:id', () => {
   it('returns 200 with the updated country on a valid body, params, and bearer token', async () => {
     updateMock.mockResolvedValue({ ...country, isActive: false })
@@ -218,38 +162,22 @@ describe('PATCH /admin/countries/:id', () => {
   })
 })
 
-describe('DELETE /admin/countries/:id', () => {
-  it('returns 200 and calls the service with the id on a valid bearer token', async () => {
-    removeMock.mockResolvedValue(country)
+// Countries come from the seed only; create/delete were removed on purpose
+describe('removed admin actions', () => {
+  it('has no POST /admin/countries', async () => {
+    const res = await request(app)
+      .post('/admin/countries')
+      .set(...authHeader)
+      .send({ isoCode: 'JP' })
 
+    expect(res.status).toBe(HttpStatus.NOT_FOUND)
+  })
+
+  it('has no DELETE /admin/countries/:id', async () => {
     const res = await request(app)
       .delete('/admin/countries/country-1')
       .set(...authHeader)
-    const body = res.body as AppResponse<undefined>
-
-    expect(res.status).toBe(HttpStatus.OK)
-    expect(body.message).toBe(SUCCESS.UTIL.delete('country'))
-    expect(removeMock).toHaveBeenCalledWith('country-1')
-  })
-
-  it('returns 401 and never calls the service when there is no Authorization header', async () => {
-    const res = await request(app).delete('/admin/countries/country-1')
-
-    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
-    expect(removeMock).not.toHaveBeenCalled()
-  })
-
-  it('forwards a service AppError (e.g. not found) to the error handler', async () => {
-    removeMock.mockRejectedValue(
-      new AppError(ERRORS.UTIL.notFound('Country'), HttpStatus.NOT_FOUND, ErrorSeverity.WARN)
-    )
-
-    const res = await request(app)
-      .delete('/admin/countries/missing-id')
-      .set(...authHeader)
-    const body = res.body as AppResponse<undefined>
 
     expect(res.status).toBe(HttpStatus.NOT_FOUND)
-    expect(body.message).toBe(ERRORS.UTIL.notFound('Country'))
   })
 })

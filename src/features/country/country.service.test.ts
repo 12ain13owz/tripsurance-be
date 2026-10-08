@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/error'
 import type { Country } from '@/generated/prisma/client'
 import { ERRORS, HttpStatus } from '@/shared/constants'
-import { create, list, listActive, remove, update } from './country.service'
+import { list, listActive, update } from './country.service'
 
 interface FindManyArgs {
   where?: { isActive: boolean }
@@ -10,23 +10,17 @@ interface FindManyArgs {
 }
 
 const findManyMock = vi.fn<(args: FindManyArgs) => Promise<Country[]>>()
-const findUniqueMock =
-  vi.fn<(args: { where: { id: string } | { isoCode: string } }) => Promise<Country | null>>()
-const createMock = vi.fn<(args: { data: { isoCode: string } }) => Promise<Country>>()
+const findUniqueMock = vi.fn<(args: { where: { id: string } }) => Promise<Country | null>>()
 const updateMock =
   vi.fn<(args: { where: { id: string }; data: { isActive: boolean } }) => Promise<Country>>()
-const deleteMock = vi.fn<(args: { where: { id: string } }) => Promise<Country>>()
 
 vi.mock('@/core/database/prisma', () => ({
   prisma: {
     country: {
       findMany: async (args: FindManyArgs) => findManyMock(args),
-      findUnique: async (args: { where: { id: string } | { isoCode: string } }) =>
-        findUniqueMock(args),
-      create: async (args: { data: { isoCode: string } }) => createMock(args),
+      findUnique: async (args: { where: { id: string } }) => findUniqueMock(args),
       update: async (args: { where: { id: string }; data: { isActive: boolean } }) =>
         updateMock(args),
-      delete: async (args: { where: { id: string } }) => deleteMock(args),
     },
   },
 }))
@@ -42,9 +36,7 @@ const country: Country = {
 beforeEach(() => {
   findManyMock.mockReset()
   findUniqueMock.mockReset()
-  createMock.mockReset()
   updateMock.mockReset()
-  deleteMock.mockReset()
 })
 
 describe('list', () => {
@@ -90,29 +82,6 @@ describe('listActive', () => {
   })
 })
 
-describe('create', () => {
-  it('creates and returns the country when the isoCode is not already taken', async () => {
-    findUniqueMock.mockResolvedValue(null)
-    createMock.mockResolvedValue(country)
-
-    const result = await create('JP')
-
-    expect(result).toEqual(country)
-    expect(findUniqueMock).toHaveBeenCalledWith({ where: { isoCode: 'JP' } })
-    expect(createMock).toHaveBeenCalledWith({ data: { isoCode: 'JP' } })
-  })
-
-  it('throws a 409 AppError and never calls create when the isoCode already exists', async () => {
-    findUniqueMock.mockResolvedValue(country)
-
-    await expect(create('JP')).rejects.toMatchObject({
-      message: ERRORS.UTIL.alreadyExists('Country'),
-      status: HttpStatus.CONFLICT,
-    })
-    expect(createMock).not.toHaveBeenCalled()
-  })
-})
-
 describe('update', () => {
   it('updates and returns the country when it exists', async () => {
     findUniqueMock.mockResolvedValue(country)
@@ -136,32 +105,10 @@ describe('update', () => {
     })
     expect(updateMock).not.toHaveBeenCalled()
   })
-})
-
-describe('remove', () => {
-  it('deletes and returns the country when it exists', async () => {
-    findUniqueMock.mockResolvedValue(country)
-    deleteMock.mockResolvedValue(country)
-
-    const result = await remove('country-1')
-
-    expect(result).toEqual(country)
-    expect(deleteMock).toHaveBeenCalledWith({ where: { id: 'country-1' } })
-  })
-
-  it('throws a 404 AppError and never calls delete when the country does not exist', async () => {
-    findUniqueMock.mockResolvedValue(null)
-
-    await expect(remove('missing-id')).rejects.toMatchObject({
-      message: ERRORS.UTIL.notFound('Country'),
-      status: HttpStatus.NOT_FOUND,
-    })
-    expect(deleteMock).not.toHaveBeenCalled()
-  })
 
   it('is an instance of AppError on the not-found path', async () => {
     findUniqueMock.mockResolvedValue(null)
 
-    await expect(remove('missing-id')).rejects.toBeInstanceOf(AppError)
+    await expect(update('missing-id', false)).rejects.toBeInstanceOf(AppError)
   })
 })
