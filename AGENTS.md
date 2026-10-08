@@ -59,7 +59,7 @@ src/
   features/  # Business features. One folder per feature. May import core + shared.
   shared/    # Pure building blocks (constants, types, utils). No feature/business logic.
   main.ts    # Entry point: middleware wiring + startServer
-  routes.ts  # Root router: mounts every feature router
+  routes.ts  # Root routers: publicRoutes + adminRoutes (mounted at /admin in app.ts)
 ```
 
 Dependency direction (never break this):
@@ -246,6 +246,23 @@ router.post('/login', validate(authSchema.login), authController.login)
 export const authRouter = router
 ```
 
+When a feature needs **more than one router** — typically a public (consumer) router plus an admin router for the same resource — don't keep the local `router` name. Declare each router with its exported name, `<feature><Audience>Router`, so one name refers to one router across the codebase (see `country.routes.ts`):
+
+```ts
+// Public (consumer): only countries currently offered as coverage
+export const countryPublicRouter = Router()
+
+countryPublicRouter.get('/', countryController.listActive)
+
+// Admin: mounted in adminRoutes, which applies authenticate to every route (see src/routes.ts)
+export const countryAdminRouter = Router()
+
+countryAdminRouter.get('/', countryController.list)
+countryAdminRouter.patch('/:id', validate(countrySchema.update), countryController.update)
+```
+
+Admin routers never add `authenticate` per route — `adminRoutes` already applies it once for everything mounted under `/admin`.
+
 ## 6. Recipe — add a new feature (example: `auth` / login)
 
 Follow these steps in order. Skip files you genuinely don't need (e.g. a read-only feature may not need a service), but keep the naming.
@@ -312,12 +329,14 @@ export const SUCCESS = {
 }
 ```
 
-8. **Register the router** in `src/routes.ts`:
+8. **Register the router** in `src/routes.ts` — on `publicRoutes` if it must be reachable without an admin token (consumer endpoints, and admin sign-in/refresh), on `adminRoutes` if every endpoint needs a signed-in admin:
 
 ```ts
 import { authRouter } from '@/features/auth'
+import { countryAdminRouter } from '@/features/country'
 // ...
-router.use('/auth', authRouter)
+publicRoutes.use('/auth', authRouter)
+adminRoutes.use('/countries', countryAdminRouter) // served at /admin/countries
 ```
 
 9. **Document the endpoint** (OpenAPI) — write this once manual testing (§8) confirms the endpoint's behavior, not while first implementing it; land it together with the tests in the same follow-up change. The spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
@@ -332,7 +351,7 @@ Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is con
 
 - Cross-feature middleware goes in `src/core/middleware/`.
 - Feature-specific middleware can live in the feature folder instead.
-- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route.
+- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route. Exception: routers mounted on `adminRoutes` get `authenticate` from `adminRoutes` itself, so they don't repeat it per route.
 
 ### `validate` — one call per route, keyed by segment
 
