@@ -24,6 +24,7 @@ export const envSchema: z.ZodType<EnvConfig> = z.object({
   LOG_LEVEL_CONSOLE: z.enum(logLevel),
   LOG_LEVEL_FILE: z.enum(logLevel),
   LOG_LEVEL_ERROR_FILE: z.enum(logLevel),
+  LOG_SILENT: z.stringbool().default(false),
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   DATABASE_URL: z.url(),
   JWT_ACCESS_SECRET: z.string().min(32),

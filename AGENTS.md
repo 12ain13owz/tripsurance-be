@@ -8,13 +8,16 @@ If anything here conflicts with the actual code, the code wins — update this f
 
 ## 1. What this project is
 
-**tripsurance-be** is the backend for a trip/travel insurance sales platform. This service covers the **admin side only** — internal staff (admin, super admin) who manage the platform. It does **not** serve end-customer/policyholder flows (no public quote/purchase API here — that's a separate concern/service if/when it exists).
+**tripsurance-be** is the backend for a trip/travel insurance sales platform. It serves **two audiences** from one API:
 
-Consequences of "admin-only, invite-based" that shape how features get built:
+- **Admin** — internal staff (admin, super admin) who manage the platform: countries, plans, orders, policies. Every admin endpoint lives under `/admin` (`adminRoutes`, which requires a bearer token).
+- **Consumer** — travellers buying insurance on the storefront: listing active countries, browsing plans, creating an order. Consumer endpoints are public (`publicRoutes`) and need **no login**.
 
-- **No self-registration.** `User` accounts are created via invite (`invitedById`/`invitationTokenHash` on the `User` model, `prisma/schema/user.prisma`) — there is no public sign-up endpoint and none should be added. Auth today only exposes sign-in (`POST /auth/sign-in`).
-- **Two roles only** — `ADMIN`, `SUPER_ADMIN` (`Role` enum, `prisma/schema/user.prisma`). No customer/policyholder role exists in this codebase.
-- When adding a feature, ask "is this something an admin does to manage the platform?" — if it's customer-facing (getting a quote, buying a policy, filing a claim as the end user), confirm with the person assigning the work before building it here.
+Consequences that shape how features get built:
+
+- **Same resource, two views → two routers.** When admins and consumers both read a resource, the public route returns only consumer-safe data (e.g. `GET /countries` → active countries only) and the admin route under `/admin` returns everything. The server decides by route — never by a query param, and never by leaving the filtering to the frontend. See `country.routes.ts` and §5.
+- **No self-registration for staff.** Admin `User` accounts are created via invite (`invitedById`/`invitationTokenHash` on the `User` model, `prisma/schema/user.prisma`) — there is no public sign-up endpoint for staff and none should be added. Auth exposes sign-in (`POST /auth/sign-in`) for admins.
+- **Two roles only** — `ADMIN`, `SUPER_ADMIN` (`Role` enum, `prisma/schema/user.prisma`), with the same permissions today. Consumers have no account or role; if consumer accounts are ever added, check `req.user.role` rather than just the presence of a token.
 
 Technically, it's a feature-based REST API: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It started from a generic starter template and has since diverged into this domain-specific backend — most of what follows in this doc is the starter's conventions, still enforced.
 
@@ -59,7 +62,7 @@ src/
   features/  # Business features. One folder per feature. May import core + shared.
   shared/    # Pure building blocks (constants, types, utils). No feature/business logic.
   main.ts    # Entry point: middleware wiring + startServer
-  routes.ts  # Root router: mounts every feature router
+  routes.ts  # Root routers: publicRoutes + adminRoutes (mounted at /admin in app.ts)
 ```
 
 Dependency direction (never break this):
@@ -246,6 +249,20 @@ router.post('/login', validate(authSchema.login), authController.login)
 export const authRouter = router
 ```
 
+When a feature needs **more than one router** — typically a public (consumer) router plus an admin router for the same resource — don't keep the local `router` name. Declare each router with its exported name, `<feature><Audience>Router`, so one name refers to one router across the codebase. Declare all routers first, then each router's routes as its own block (see `country.routes.ts`; `src/routes.ts` follows the same shape for `publicRoutes`/`adminRoutes`):
+
+```ts
+export const countryPublicRouter = Router()
+export const countryAdminRouter = Router()
+
+countryPublicRouter.get('/', countryController.listActive)
+
+countryAdminRouter.get('/', countryController.list)
+countryAdminRouter.patch('/:id', validate(countrySchema.update), countryController.update)
+```
+
+Admin routers never add `authenticate` per route — `adminRoutes` already applies it once for everything mounted under `/admin`.
+
 ## 6. Recipe — add a new feature (example: `auth` / login)
 
 Follow these steps in order. Skip files you genuinely don't need (e.g. a read-only feature may not need a service), but keep the naming.
@@ -312,12 +329,14 @@ export const SUCCESS = {
 }
 ```
 
-8. **Register the router** in `src/routes.ts`:
+8. **Register the router** in `src/routes.ts` — on `publicRoutes` if it must be reachable without an admin token (consumer endpoints, and admin sign-in/refresh), on `adminRoutes` if every endpoint needs a signed-in admin:
 
 ```ts
 import { authRouter } from '@/features/auth'
+import { countryAdminRouter } from '@/features/country'
 // ...
-router.use('/auth', authRouter)
+publicRoutes.use('/auth', authRouter)
+adminRoutes.use('/countries', countryAdminRouter) // served at /admin/countries
 ```
 
 9. **Document the endpoint** (OpenAPI) — write this once manual testing (§8) confirms the endpoint's behavior, not while first implementing it; land it together with the tests in the same follow-up change. The spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
@@ -332,7 +351,7 @@ Third-party middleware (`cors`, `helmet`, `express-rate-limit`, `morgan`) is con
 
 - Cross-feature middleware goes in `src/core/middleware/`.
 - Feature-specific middleware can live in the feature folder instead.
-- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route.
+- Wire global middleware in `main.ts`; wire per-route middleware (like `validate`, `authenticate`) directly on the route. Exception: routers mounted on `adminRoutes` get `authenticate` from `adminRoutes` itself, so they don't repeat it per route.
 
 ### `validate` — one call per route, keyed by segment
 
@@ -365,7 +384,7 @@ export const update = async (
   ...
 ```
 
-Leave the `ResBody` slot (2nd position) as `unknown` — the response shape is controlled through `createResponse` (§4), not through this generic. Omit a position you don't need (e.g. `Request<unknown, unknown, CreateCountryInput>` for a body-only route, `Request<CountryIdParams>` for a params-only one).
+Leave the `ResBody` slot (2nd position) as `unknown` — the response shape is controlled through `createResponse` (§4), not through this generic. Omit a position you don't need (e.g. `Request<unknown, unknown, SignInInput>` for a body-only route, `Request<CountryIdParams>` for a params-only one).
 
 For a route behind `authenticate` (`core/middleware/authenticate.ts`, verifies the `Authorization: Bearer` token and sets `req.user` before calling `next()`) whose handler reads `req.user`: don't re-check it for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead use `AuthenticatedRequest<Params, ResBody, ReqBody, ReqQuery>` (`core/middleware/authenticate.type.ts`) in place of `Request<...>` — same generic positions, plus `user: AccessTokenPayload` guaranteed present (globally it's `AccessTokenPayload | undefined` on `core/types/express.d.ts`, since most routes aren't authenticated):
 
@@ -462,6 +481,8 @@ fix(logger): prevent metadata from clobbering reserved log fields
 
 - Before editing any code, list the specific changes you plan to make and wait for explicit go-ahead — don't start editing on your own initiative just because a request implies a code change.
 - Exception: if the user's message already gives the go-ahead ("confirm, go ahead", "fix it", "implement this"), proceed without a separate list-first round.
+- **"draft code" means reply with the proposed code as text/code blocks in the conversation only — never call Edit/Write on the file.** The user reviews the draft, decides what to keep, and applies it themselves. Reason: once a change is actually written to disk, review narrows to one file's diff at a time and loses sight of the full set of proposed changes across files — seeing everything up front in chat makes it easier to decide what to change before anything is written for real.
+- **"commit message" means reply with the title + body text only (§10 format) — never run `git add`/`git commit` for it.** The user stages and commits it themselves after reviewing both the code and the message together.
 - This covers all code changes, not just git actions — see §12 Git workflow below for commit/push-specific rules.
 - **If not explicitly asked for, don't do it — ask first, every time.** This includes actions taken only to "verify" or "try out" an idea (running a script, renaming/moving/deleting a file to simulate some condition, installing something) — not just feature edits. A question ("how do I get X working?") is a request for an answer, not a request to go implement or experiment with X.
 - Never rename, move, or delete a file — even "temporarily," even inside a cleanup/`finally` step — unless the user asked for that specific file to be touched. This happened once already: a local CI-simulation experiment (nobody asked for) deleted `.env.prod`, an untracked, unrecoverable file with real production secrets, via a careless cleanup step. Verify behavior by reading/inspecting or working in a disposable scratch copy, never by modifying real project files and "restoring" them after.

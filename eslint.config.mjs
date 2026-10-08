@@ -100,6 +100,8 @@ export default defineConfig(
       // ── Imports ──────────────────────────────────────────────────────────────
       'unused-imports/no-unused-imports': 'error', // auto-remove unused imports on --fix
       'import/no-duplicates': 'error',
+      // Auto-import merges types inline (`{ foo, type Bar }`); force them onto a separate `import type` line
+      'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
       'import/no-cycle': 'warn', // circular deps between feature/core modules
       // Same-folder imports use `./foo`; anything crossing a folder boundary must use the `@/` alias
       'import/no-relative-parent-imports': 'error',
@@ -168,6 +170,7 @@ export default defineConfig(
         'error',
         { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
       ],
+      'import/consistent-type-specifier-style': ['error', 'prefer-top-level'],
       'unused-imports/no-unused-imports': 'error',
       'import/order': importOrderRule,
     },

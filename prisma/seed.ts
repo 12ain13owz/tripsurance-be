@@ -1,6 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../src/generated/prisma/client'
-import { seedUsers } from './seeds'
+import { seedCountries, seedUsers } from './seeds'
 
 function createSeedPrisma(): PrismaClient {
   const connectionString = process.env.DATABASE_URL ?? ''
@@ -13,6 +13,7 @@ export async function runSeed(): Promise<void> {
 
   try {
     await seedUsers(prisma)
+    await seedCountries(prisma)
   } finally {
     await prisma.$disconnect()
   }

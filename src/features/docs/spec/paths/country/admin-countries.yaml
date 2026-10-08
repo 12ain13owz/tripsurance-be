@@ -1,0 +1,28 @@
+get:
+  tags:
+    - Country
+  summary: List all countries
+  operationId: listCountries
+  description: >-
+    Admin only. Returns every country regardless of isActive, ordered by
+    isoCode ascending. Consumers use GET /countries, which returns active
+    countries only. There is no create endpoint — countries come from the
+    ISO 3166-1 seed (`prisma/seeds/country.ts`).
+  security:
+    - bearerAuth: []
+  responses:
+    '200':
+      description: Listed country successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/country-list-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'

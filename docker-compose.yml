@@ -1,5 +1,6 @@
 services:
   nodejs:
+    profiles: [prod]
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,6 +11,22 @@ services:
       - .env.prod
     ports:
       - '3000:3000'
+
+  postgres:
+    image: postgres:18
+    container_name: tripsurance-postgres
+    environment:
+      POSTGRES_USER: user_postgres
+      POSTGRES_PASSWORD: pass_postgres
+      POSTGRES_DB: tripsurance
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U user_postgres']
+      interval: 2s
+      retries: 15
 
   stripe-cli:
     profiles: [stripe]
@@ -23,3 +40,6 @@ services:
     command: listen --forward-to host.docker.internal:3000/payments/webhook
     extra_hosts:
       - host.docker.internal:host-gateway
+
+volumes:
+  db-postgres-data:

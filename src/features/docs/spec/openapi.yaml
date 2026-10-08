@@ -40,7 +40,9 @@ paths:
     $ref: './paths/auth/session-by-id.yaml'
   /countries:
     $ref: './paths/country/countries.yaml'
-  /countries/{id}:
+  /admin/countries:
+    $ref: './paths/country/admin-countries.yaml'
+  /admin/countries/{id}:
     $ref: './paths/country/country-by-id.yaml'
 
 components:
@@ -83,8 +85,6 @@ components:
       $ref: './components/models/country-list-response.schema.yaml'
     CountryResponse:
       $ref: './components/models/country-response.schema.yaml'
-    CreateCountryRequest:
-      $ref: './components/models/create-country-request.schema.yaml'
     UpdateCountryRequest:
       $ref: './components/models/update-country-request.schema.yaml'
   responses:
