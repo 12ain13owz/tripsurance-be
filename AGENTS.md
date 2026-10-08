@@ -8,13 +8,16 @@ If anything here conflicts with the actual code, the code wins — update this f
 
 ## 1. What this project is
 
-**tripsurance-be** is the backend for a trip/travel insurance sales platform. This service covers the **admin side only** — internal staff (admin, super admin) who manage the platform. It does **not** serve end-customer/policyholder flows (no public quote/purchase API here — that's a separate concern/service if/when it exists).
+**tripsurance-be** is the backend for a trip/travel insurance sales platform. It serves **two audiences** from one API:
 
-Consequences of "admin-only, invite-based" that shape how features get built:
+- **Admin** — internal staff (admin, super admin) who manage the platform: countries, plans, orders, policies. Every admin endpoint lives under `/admin` (`adminRoutes`, which requires a bearer token).
+- **Consumer** — travellers buying insurance on the storefront: listing active countries, browsing plans, creating an order. Consumer endpoints are public (`publicRoutes`) and need **no login**.
 
-- **No self-registration.** `User` accounts are created via invite (`invitedById`/`invitationTokenHash` on the `User` model, `prisma/schema/user.prisma`) — there is no public sign-up endpoint and none should be added. Auth today only exposes sign-in (`POST /auth/sign-in`).
-- **Two roles only** — `ADMIN`, `SUPER_ADMIN` (`Role` enum, `prisma/schema/user.prisma`). No customer/policyholder role exists in this codebase.
-- When adding a feature, ask "is this something an admin does to manage the platform?" — if it's customer-facing (getting a quote, buying a policy, filing a claim as the end user), confirm with the person assigning the work before building it here.
+Consequences that shape how features get built:
+
+- **Same resource, two views → two routers.** When admins and consumers both read a resource, the public route returns only consumer-safe data (e.g. `GET /countries` → active countries only) and the admin route under `/admin` returns everything. The server decides by route — never by a query param, and never by leaving the filtering to the frontend. See `country.routes.ts` and §5.
+- **No self-registration for staff.** Admin `User` accounts are created via invite (`invitedById`/`invitationTokenHash` on the `User` model, `prisma/schema/user.prisma`) — there is no public sign-up endpoint for staff and none should be added. Auth exposes sign-in (`POST /auth/sign-in`) for admins.
+- **Two roles only** — `ADMIN`, `SUPER_ADMIN` (`Role` enum, `prisma/schema/user.prisma`), with the same permissions today. Consumers have no account or role; if consumer accounts are ever added, check `req.user.role` rather than just the presence of a token.
 
 Technically, it's a feature-based REST API: **Node.js (ESM) + Express 5 + TypeScript 6**. Environment is validated with Zod, logging uses Winston, and errors flow through a single error middleware. It started from a generic starter template and has since diverged into this domain-specific backend — most of what follows in this doc is the starter's conventions, still enforced.
 
@@ -381,7 +384,7 @@ export const update = async (
   ...
 ```
 
-Leave the `ResBody` slot (2nd position) as `unknown` — the response shape is controlled through `createResponse` (§4), not through this generic. Omit a position you don't need (e.g. `Request<unknown, unknown, CreateCountryInput>` for a body-only route, `Request<CountryIdParams>` for a params-only one).
+Leave the `ResBody` slot (2nd position) as `unknown` — the response shape is controlled through `createResponse` (§4), not through this generic. Omit a position you don't need (e.g. `Request<unknown, unknown, SignInInput>` for a body-only route, `Request<CountryIdParams>` for a params-only one).
 
 For a route behind `authenticate` (`core/middleware/authenticate.ts`, verifies the `Authorization: Bearer` token and sets `req.user` before calling `next()`) whose handler reads `req.user`: don't re-check it for `undefined` in the controller or service — that's re-validating something `authenticate` already guarantees. Instead use `AuthenticatedRequest<Params, ResBody, ReqBody, ReqQuery>` (`core/middleware/authenticate.type.ts`) in place of `Request<...>` — same generic positions, plus `user: AccessTokenPayload` guaranteed present (globally it's `AccessTokenPayload | undefined` on `core/types/express.d.ts`, since most routes aren't authenticated):
 
