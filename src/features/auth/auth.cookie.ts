@@ -22,7 +22,14 @@ const baseCookieOptions: SerializeOptions = {
   domain: isProduction ? env.COOKIE_DOMAIN : undefined,
 }
 
-export const setRefreshCookie = (res: Response, refreshToken: string, maxAgeSec: number): void => {
+// expiresAtSec is the token's JWT `exp` (epoch seconds); Max-Age needs the seconds left from now
+export const setRefreshCookie = (
+  res: Response,
+  refreshToken: string,
+  expiresAtSec: number
+): void => {
+  const maxAgeSec = Math.max(0, expiresAtSec - Math.floor(Date.now() / 1000))
+
   res.append(
     'Set-Cookie',
     stringifySetCookie({

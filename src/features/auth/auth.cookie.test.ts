@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppEnv } from '@/shared/types'
 import type * as AuthCookie from './auth.cookie'
 import type { Request, Response } from 'express'
@@ -19,7 +19,15 @@ const loadAuthCookie = async (
   return import('./auth.cookie')
 }
 
+const NOW_MS = Date.UTC(2026, 0, 1)
+const nowSec = (): number => NOW_MS / 1000
+
+beforeEach(() => {
+  vi.useFakeTimers({ now: NOW_MS })
+})
+
 afterEach(() => {
+  vi.useRealTimers()
   vi.doUnmock('@/core/config')
 })
 
@@ -28,7 +36,7 @@ describe('setRefreshCookie (development)', () => {
     const { setRefreshCookie } = await loadAuthCookie(AppEnv.DEVELOPMENT)
     const { res, append } = makeRes()
 
-    setRefreshCookie(res, 'refresh-token-value', 3600)
+    setRefreshCookie(res, 'refresh-token-value', nowSec() + 3600)
 
     expect(append).toHaveBeenCalledTimes(1)
     const [header, cookie] = append.mock.calls[0] as [string, string]
@@ -47,11 +55,23 @@ describe('setRefreshCookie (production)', () => {
     const { setRefreshCookie } = await loadAuthCookie(AppEnv.PRODUCTION, 'tripsurance.com')
     const { res, append } = makeRes()
 
-    setRefreshCookie(res, 'refresh-token-value', 3600)
+    setRefreshCookie(res, 'refresh-token-value', nowSec() + 3600)
 
     const [_header, cookie] = append.mock.calls[0] as [string, string]
     expect(cookie).toContain('Secure')
     expect(cookie).toContain('Domain=tripsurance.com')
+  })
+})
+
+describe('setRefreshCookie (expiry)', () => {
+  it('uses Max-Age=0 when the token has already expired', async () => {
+    const { setRefreshCookie } = await loadAuthCookie(AppEnv.DEVELOPMENT)
+    const { res, append } = makeRes()
+
+    setRefreshCookie(res, 'refresh-token-value', nowSec() - 60)
+
+    const [_header, cookie] = append.mock.calls[0] as [string, string]
+    expect(cookie).toContain('Max-Age=0')
   })
 })
 
