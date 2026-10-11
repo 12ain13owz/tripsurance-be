@@ -24,7 +24,7 @@ Technically, it's a feature-based REST API: **Node.js (ESM) + Express 5 + TypeSc
 Already wired up in this project (diverged from the bare `node-express-ts-starter` base — check that repo if you need the generic, auth-free version):
 
 - **Database / ORM** — Prisma (`prisma/schema/`), client exported from `@/core/database/prisma`.
-- **Auth** — JWT access + refresh tokens (`@/core/security/jwt.ts`), sign-in/refresh/sign-out flows in `src/features/auth/`. Refresh token travels as an httpOnly cookie (`auth.cookie.ts`); access token is returned in the response body and expected as a `Bearer` header on protected routes.
+- **Auth** — JWT access + refresh tokens (`@/core/security/jwt.ts`), sign-in/refresh/sign-out flows in `src/features/auth/`. Refresh token travels as an httpOnly cookie (`auth.cookie.ts`); access token is returned in the response body and expected as a `Bearer` header on protected routes. The cookie's `Max-Age` is derived from the token's JWT `exp` (`setRefreshCookie` takes `exp`, not a duration), so cookie and token expire together.
 - **Custom middleware folder** — `src/core/middleware/` exists: `validate.ts` (Zod request validation) and `authenticate.ts` (verifies the access token, attaches the payload to `req.user`), each wired per-route (see `auth.routes.ts`).
 
 Still not wired up — add only when a consuming feature actually needs it, don't pre-build speculatively:
@@ -176,6 +176,8 @@ Import `env` from `@/core/config`, never from `./env/env`. Add env-dependent mid
 - HTTP codes come from the `HttpStatus` enum, never magic numbers.
 - To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` (`core/error/error.middleware.ts`, wired in `app.ts`) formats it (full details in development, message-only in production).
 - Malformed JSON request bodies never reach a controller — `express.json()` throws before routing, and the error isn't an `AppError`. `errorHandler` detects this case (`SyntaxError` with `.type === 'entity.parse.failed'`) and normalizes it to a `400` `AppError` (`ERRORS.GENERIC.INVALID_JSON_BODY`) instead of leaking the raw parser message and defaulting to `500`. Follow the same normalize-before-formatting approach for any other non-`AppError` exception that has a well-known client-facing meaning.
+- **`message` is user-facing.** tripsurance-fe shows 4xx error messages and (when a call opts in) success messages directly to admin users as toasts. Write them as short, readable sentences ("Signed in successfully", "Invalid email or password"). 5xx messages are never shown — the FE replaces them with a generic one.
+- **401 means "the access token is missing, invalid or expired" — nothing else.** On a 401 from a request sent with a Bearer token, the FE calls `/auth/refresh` and retries once. Don't use 401 on an authenticated route for a business rule (e.g. wrong current password on change-password) — use `400` (or `403` for permission) so it doesn't trigger a pointless refresh. 401 for wrong credentials on public routes like sign-in is fine, since those are sent without a token.
 
 `AppError` builder methods:
 
