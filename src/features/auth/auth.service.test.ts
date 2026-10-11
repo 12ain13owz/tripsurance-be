@@ -474,7 +474,7 @@ describe('changePassword', () => {
       changePassword('user-1', 'wrong-current', 'NewStrong1!', 'refresh-token')
     ).rejects.toMatchObject({
       message: AUTH_ERRORS.INVALID_CURRENT_PASSWORD,
-      status: HttpStatus.UNAUTHORIZED,
+      status: HttpStatus.BAD_REQUEST,
     })
     expect(userUpdateMock).not.toHaveBeenCalled()
   })

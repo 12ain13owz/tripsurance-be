@@ -210,7 +210,7 @@ export const changePassword = async (
   if (!passwordMatch) {
     throw new AppError(
       AUTH_ERRORS.INVALID_CURRENT_PASSWORD,
-      HttpStatus.UNAUTHORIZED,
+      HttpStatus.BAD_REQUEST,
       ErrorSeverity.WARN
     )
       .withOperation('changePassword')

@@ -351,11 +351,7 @@ describe('POST /auth/change-password', () => {
 
   it('forwards a service AppError (e.g. the current password is wrong) to the error handler', async () => {
     changePasswordMock.mockRejectedValue(
-      new AppError(
-        AUTH_ERRORS.INVALID_CURRENT_PASSWORD,
-        HttpStatus.UNAUTHORIZED,
-        ErrorSeverity.WARN
-      )
+      new AppError(AUTH_ERRORS.INVALID_CURRENT_PASSWORD, HttpStatus.BAD_REQUEST, ErrorSeverity.WARN)
     )
 
     const res = await request(app)
@@ -364,7 +360,7 @@ describe('POST /auth/change-password', () => {
       .send(validBody)
     const body = res.body as AppResponse<undefined>
 
-    expect(res.status).toBe(HttpStatus.UNAUTHORIZED)
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST)
     expect(body.message).toBe(AUTH_ERRORS.INVALID_CURRENT_PASSWORD)
   })
 })
