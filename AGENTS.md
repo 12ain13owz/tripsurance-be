@@ -4,6 +4,8 @@ Guidance for AI assistants (and humans) working in this repository. Read this **
 
 If anything here conflicts with the actual code, the code wins — update this file in the same change.
 
+**What each feature does** (data model, business rules, endpoints) is in `docs/features/<feature>.md` — read the relevant one before touching a feature; it's much cheaper than reading the code. This file is about _how_ to write code; the root `../ROADMAP.md` is about _what_ to build next.
+
 ---
 
 ## 1. What this project is
@@ -269,6 +271,8 @@ Admin routers never add `authenticate` per route — `adminRoutes` already appli
 
 Follow these steps in order. Skip files you genuinely don't need (e.g. a read-only feature may not need a service), but keep the naming.
 
+0. **Write the feature doc first** — `docs/features/<feature>.md`, using the template in `docs/features/README.md`. Agree on it with the user and commit it on its own (`docs(<feature>): ...`) before any code. While building, if a rule changes, update the doc in the same commit as the code.
+
 1. **Create the folder** `src/features/auth/`.
 
 2. **Validation** — `auth.schema.ts` (use Zod, the same validator already used for env):
@@ -341,7 +345,7 @@ publicRoutes.use('/auth', authRouter)
 adminRoutes.use('/countries', countryAdminRouter) // served at /admin/countries
 ```
 
-9. **Document the endpoint** (OpenAPI) — write this once manual testing (§8) confirms the endpoint's behavior, not while first implementing it; land it together with the tests in the same follow-up change. The spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not a top-level `docs/` directory. Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
+9. **Document the endpoint** (OpenAPI) — write this once manual testing (§8) confirms the endpoint's behavior, not while first implementing it; land it together with the tests in the same follow-up change. The spec lives in `src/features/docs/spec/` — the `docs` feature reads it from disk at runtime (`SwaggerParser.bundle`) to serve `/docs/openapi.json` and the Scalar UI, so it ships inside the feature folder, not the top-level `docs/` directory (which holds only the human-readable feature docs, see step 0). Add a path file under `src/features/docs/spec/paths/auth/`, reference it from `src/features/docs/spec/openapi.yaml`, and reuse shared schemas/responses where possible. Because `tsc` only compiles `.ts` files, `npm run build` copies this `spec/` tree into `dist/` via the `copy-assets` script (`package.json`) — if the spec ever moves, keep that copy step pointed at the new path.
 
    **`summary` vs `description`** — `summary` is the operation's display name in the docs UI (Scalar) and must stay a short verb phrase, 2–4 words, Title Case, no trailing punctuation (`Sign in`, `List sessions`, `Revoke other sessions`) — mirror the short name already used for the same request in `tripsurance.postman_collection.json` where one exists. Everything else — behavior, edge cases, rate limits, side effects, gotchas for the client — goes in `description`, not `summary`. Don't restate the summary at the start of the description; write description as if summary weren't there. `operationId` (camelCase, e.g. `signIn`, `listSessions`) is separate from both and used for codegen, not display — keep it short too but it doesn't need to match `summary` word-for-word.
 
