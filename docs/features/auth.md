@@ -91,7 +91,5 @@ Shapes: OpenAPI at `/docs`.
 
 ## Known gaps
 
-- `authService.cleanupExpiredTokens` (deletes revoked/expired/used tokens) exists but **nothing calls
-  it yet** — needs a scheduled job.
 - Invite flow (create staff account + set password) not built.
 - FE screens for sessions and change-password are deferred (see `ROADMAP.md` backlog).
