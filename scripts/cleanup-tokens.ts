@@ -1,8 +1,8 @@
 import { logger } from '@/core/logger'
-import { cleanupExpiredTokens } from '@/features/auth/auth.service'
+import { cleanupExpiredTokens, TOKEN_RETENTION_MS } from '@/features/auth'
 
 const main = async (): Promise<void> => {
-  const result = await cleanupExpiredTokens()
+  const result = await cleanupExpiredTokens(TOKEN_RETENTION_MS)
   logger.info('Token cleanup complete', result)
 }
 

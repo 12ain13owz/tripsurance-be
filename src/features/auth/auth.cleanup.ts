@@ -4,7 +4,7 @@ import { AUTH_LOG } from './auth.const'
 import { cleanupExpiredTokens } from './auth.service'
 
 // Dead tokens are kept for a week so a suspicious session can still be traced, then dropped
-const TOKEN_RETENTION_MS = parseDuration('7d')
+export const TOKEN_RETENTION_MS = parseDuration('7d')
 const CLEANUP_INTERVAL_MS = parseDuration('1d')
 
 const runCleanup = async (): Promise<void> => {
