@@ -61,6 +61,8 @@ active super admin.
    **all** sessions, and signs the user in (returns a new token pair).
 8. Change/forgot/reset password are rate-limited (5 per 15 min in production).
 9. Never log passwords or raw tokens; log only hashes/ids.
+10. Revoked, used or expired tokens are deleted once they are more than 7 days past that point. The
+    cleanup runs on server start, then every 24 hours (`auth.cleanup.ts`).
 
 ## Endpoints
 

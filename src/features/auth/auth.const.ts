@@ -19,3 +19,8 @@ export const AUTH_ERRORS = {
   RESET_TOKEN_EXPIRED: 'Password reset token has expired',
   SESSION_NOT_FOUND: 'Session not found',
 }
+
+export const AUTH_LOG = {
+  tokenCleanup: (refreshTokens: number, passwordResetTokens: number) =>
+    `Token cleanup removed ${refreshTokens} refresh and ${passwordResetTokens} password reset tokens`,
+}

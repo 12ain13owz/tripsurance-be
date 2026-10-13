@@ -749,7 +749,7 @@ describe('cleanupExpiredTokens', () => {
     refreshTokenDeleteManyMock.mockResolvedValue({ count: 3 })
     passwordResetTokenDeleteManyMock.mockResolvedValue({ count: 2 })
 
-    const result = await cleanupExpiredTokens()
+    const result = await cleanupExpiredTokens(0)
 
     expect(result).toEqual({ refreshTokens: 3, passwordResetTokens: 2 })
   })
@@ -757,7 +757,7 @@ describe('cleanupExpiredTokens', () => {
   it('wraps an unexpected DB failure into a generic AppError instead of leaking it', async () => {
     refreshTokenDeleteManyMock.mockRejectedValue(new Error('connection refused'))
 
-    await expect(cleanupExpiredTokens()).rejects.toMatchObject({
+    await expect(cleanupExpiredTokens(0)).rejects.toMatchObject({
       message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR,
       status: HttpStatus.INTERNAL_SERVER_ERROR,
     })

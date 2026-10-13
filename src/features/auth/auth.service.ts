@@ -355,20 +355,21 @@ export const revokeOtherSessions = async (
   await revokeOtherRefreshTokens(userId, currentToken, 'revokeOtherSessions')
 }
 
-export const cleanupExpiredTokens = async (): Promise<{
+export const cleanupExpiredTokens = async (
+  retentionMs: number
+): Promise<{
   refreshTokens: number
   passwordResetTokens: number
 }> => {
-  const now = new Date()
-
+  const cutoff = new Date(Date.now() - retentionMs)
   const [refreshTokens, passwordResetTokens] = await wrapUnexpected(
     async () =>
       prisma.$transaction([
         prisma.refreshToken.deleteMany({
-          where: { OR: [{ revokedAt: { not: null } }, { expiresAt: { lt: now } }] },
+          where: { OR: [{ revokedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }] },
         }),
         prisma.passwordResetToken.deleteMany({
-          where: { OR: [{ usedAt: { not: null } }, { expiresAt: { lt: now } }] },
+          where: { OR: [{ usedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }] },
         }),
       ]),
     { operation: 'cleanupExpiredTokens' }
