@@ -179,6 +179,17 @@ Import `env` from `@/core/config`, never from `./env/env`. Add env-dependent mid
 - To raise an error, `throw new AppError(message, status, severity)` and chain context, then call `next(error)`. The global `errorHandler` (`core/error/error.middleware.ts`, wired in `app.ts`) formats it (full details in development, message-only in production).
 - Malformed JSON request bodies never reach a controller — `express.json()` throws before routing, and the error isn't an `AppError`. `errorHandler` detects this case (`SyntaxError` with `.type === 'entity.parse.failed'`) and normalizes it to a `400` `AppError` (`ERRORS.GENERIC.INVALID_JSON_BODY`) instead of leaking the raw parser message and defaulting to `500`. Follow the same normalize-before-formatting approach for any other non-`AppError` exception that has a well-known client-facing meaning.
 - **Only an `AppError`'s message reaches the client.** Any other error (Prisma, driver, third-party library) gets `500` + `ERRORS.GENERIC.INTERNAL_SERVER_ERROR` from `errorHandler`, regardless of its own message — raw messages can carry internals (table/column names, connection details). The original is still logged. Don't loosen this to pass a non-`AppError` message through; if a failure needs a client-facing message, throw (or normalize to) an `AppError`.
+- **`message` is user-facing.** tripsurance-fe shows 4xx error messages and (when a call opts in) success messages directly to admin users as toasts. Write them as short, readable sentences ("Signed in successfully", "Invalid email or password"). 5xx messages are never shown — the FE replaces them with a generic one.
+- **401 means "the access token is missing, invalid or expired" — nothing else.** On a 401 from a request sent with a Bearer token, the FE calls `/auth/refresh` and retries once. Don't use 401 on an authenticated route for a business rule (e.g. wrong current password on change-password) — use `400` (or `403` for permission) so it doesn't trigger a pointless refresh. 401 for wrong credentials on public routes like sign-in is fine, since those are sent without a token.
+
+`AppError` builder methods:
+
+```ts
+throw new AppError(ERRORS.GENERIC.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
+  .withOperation('login') // logical operation name
+  .withEndpoint(req) // method, url, params, query, body
+  .withMetadata({ email }) // extra structured context (no secrets/passwords)
+```
 
 ### Wrapping DB / external calls (`wrapUnexpected`)
 
@@ -193,14 +204,17 @@ const query = prisma.addon.findUnique({ where: { id } })
 const addon = await wrapUnexpected(query, operation, { id })
 ```
 
-- **Naming** — one wrapped call in the function: name it `query`. More than one in the same scope: name each `<resultName>Query` after the variable it resolves into (`existingQuery` -> `existing`, `addonQuery` -> `addon`).
+- **Naming** — pick the first rule that applies:
+  1. One wrapped call in the function → `query`.
+  2. More than one, and each result lands in a plain named variable → `<resultName>Query`, after the variable it resolves into (`existingQuery` -> `existing`, `addonQuery` -> `addon`).
+  3. More than one, and a result has no meaningful name (not kept — bare `await`/`return` — or destructured, e.g. `const { count }`) → `<verb><Entity>Query`, after the action (`revokeTokensQuery`, `createResetTokenQuery`).
   ```ts
   const existingQuery = prisma.addon.findUnique({ where: { code: input.code } })
   const existing = await wrapUnexpected(existingQuery, 'createAddon', { code: input.code })
   ```
 - **No result / direct return** — same two-statement shape: `await wrapUnexpected(query, ...)` or `return wrapUnexpected(query, ...)`.
 - **`$transaction([...])`** — same as a single query; it's lazy too.
-- **Not a single query** (multi-step logic that throws itself, e.g. `sendMail` checking Resend's `{ error }`) — wrap the logic in an immediately-invoked `async` function so it becomes a promise, name it after the action, then wrap it:
+- **Not a single query** (multi-step logic that throws itself, e.g. `sendMail` checking Resend's `{ error }`) — wrap the logic in an immediately-invoked `async` function so it becomes a promise, name it after the action (same spirit as rule 3, without the `Query` suffix since it isn't one), then wrap it:
   ```ts
   const send = (async () => {
     const { error } = await resend.emails.send(mailConfig)
@@ -212,17 +226,6 @@ const addon = await wrapUnexpected(query, operation, { id })
   ```
 - **Why passing the query is safe** — a Prisma query doesn't run until it's awaited, and that `await` happens inside `wrapUnexpected`'s `try`, so a rejection is always caught. Don't `await` the query yourself before passing it.
 - **`metadata` is the flat context object** (`{ id }`), not an options bag (`{ metadata: { id } }`) — the parameter is `Record<string, unknown>`, so the nested form type-checks but logs `metadata.metadata`. Never put secrets (passwords, raw tokens) in it.
-- **`message` is user-facing.** tripsurance-fe shows 4xx error messages and (when a call opts in) success messages directly to admin users as toasts. Write them as short, readable sentences ("Signed in successfully", "Invalid email or password"). 5xx messages are never shown — the FE replaces them with a generic one.
-- **401 means "the access token is missing, invalid or expired" — nothing else.** On a 401 from a request sent with a Bearer token, the FE calls `/auth/refresh` and retries once. Don't use 401 on an authenticated route for a business rule (e.g. wrong current password on change-password) — use `400` (or `403` for permission) so it doesn't trigger a pointless refresh. 401 for wrong credentials on public routes like sign-in is fine, since those are sent without a token.
-
-`AppError` builder methods:
-
-```ts
-throw new AppError(ERRORS.GENERIC.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, ErrorSeverity.WARN)
-  .withOperation('login') // logical operation name
-  .withEndpoint(req) // method, url, params, query, body
-  .withMetadata({ email }) // extra structured context (no secrets/passwords)
-```
 
 ## 5. Controller pattern (copy this shape)
 
