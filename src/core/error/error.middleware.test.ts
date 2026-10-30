@@ -45,6 +45,18 @@ describe('errorHandler', () => {
     )
   })
 
+  it('replaces a plain Error message with the generic message', async () => {
+    const { res, status, json } = makeRes()
+    const error = new Error('relation "addon" does not exist')
+
+    await errorHandler(error, {} as never, res, vi.fn())
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR)
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: ERRORS.GENERIC.INTERNAL_SERVER_ERROR })
+    )
+  })
+
   it('attaches structured debug data in development', async () => {
     env.NODE_ENV = AppEnv.DEVELOPMENT
     const { res, json } = makeRes()
