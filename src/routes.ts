@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { authenticate } from '@/core/middleware'
+import { addonAdminRouter } from '@/features/addon'
 import { authRouter } from '@/features/auth'
 import { countryAdminRouter, countryPublicRouter } from '@/features/country'
 import { docsRouter } from '@/features/docs'
@@ -15,3 +16,4 @@ publicRoutes.use('/countries', countryPublicRouter)
 
 adminRoutes.use(authenticate)
 adminRoutes.use('/countries', countryAdminRouter)
+adminRoutes.use('/addons', addonAdminRouter)

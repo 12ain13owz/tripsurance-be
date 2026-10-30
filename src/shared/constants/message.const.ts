@@ -21,6 +21,8 @@ export const SUCCESS = {
     delete: (name: string) => `Deleted ${name} successfully`,
     save: (name: string) => `Saved ${name} successfully`,
     upload: (name: string) => `Uploaded ${name} successfully`,
+    fetch: (name: string) => `Fetched ${name} successfully`,
+    reorder: (name: string) => `Reordered ${name} successfully`,
   },
 }
 
@@ -37,6 +39,7 @@ export const ERRORS = {
     BAD_GATEWAY: 'Bad gateway',
     UNSPECIFIED_FUNCTION: 'Unspecified function',
     INVALID_JSON_BODY: 'Invalid JSON in request body',
+    EMPTY_UPDATE: 'Nothing to update',
   },
   AUTH: {
     MISSING_TOKEN: 'Authentication required',
@@ -54,5 +57,7 @@ export const ERRORS = {
     minLength: (field: string, length: number) => `${field} must be at least ${length} characters`,
     failedAction: (action?: string, target?: string) => `Failed to ${action} ${target}`,
     weakPassword: (field: string) => `${field} is too weak`,
+    maxLength: (field: string, length: number) => `${field} must be at most ${length} characters`,
+    reorderMismatch: (item: string) => `Reorder must list every ${item} exactly once`,
   },
 }

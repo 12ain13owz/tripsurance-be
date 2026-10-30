@@ -1,0 +1,17 @@
+enum AddonPricingType {
+  PER_ORDER
+  PER_TRAVELLER
+  PER_TRAVELLER_PER_DAY
+}
+
+model Addon {
+  id             String           @id @default(cuid())
+  code           String           @unique // stable slug, never renamed
+  pricingType    AddonPricingType
+  price          Int // satang, gross (incl. stamp duty + VAT)
+  coverageAmount Int? // satang
+  isActive       Boolean          @default(false)
+  sortOrder      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
