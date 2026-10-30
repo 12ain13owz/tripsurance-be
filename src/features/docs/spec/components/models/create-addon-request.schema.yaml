@@ -1,0 +1,32 @@
+type: object
+description: >-
+  sortOrder and isActive are not accepted — the add-on is created inactive
+  and placed last. Unknown fields are stripped.
+required:
+  - code
+  - pricingType
+  - price
+properties:
+  code:
+    type: string
+    maxLength: 50
+    pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+    description: Lowercase kebab-case slug; must be unique (409 if taken).
+    example: trip-cancellation-plus
+  pricingType:
+    type: string
+    enum: [PER_ORDER, PER_TRAVELLER, PER_TRAVELLER_PER_DAY]
+    example: PER_TRAVELLER
+  price:
+    type: integer
+    minimum: 1
+    maximum: 100000000
+    description: Gross unit price in **satang** (1 THB = 100). 2000 = ฿20.00.
+    example: 2000
+  coverageAmount:
+    type: integer
+    nullable: true
+    minimum: 1
+    maximum: 100000000
+    description: Extra sum insured in **satang**; omit or null for none.
+    example: 1000000

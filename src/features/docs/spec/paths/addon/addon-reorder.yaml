@@ -1,0 +1,55 @@
+patch:
+  tags:
+    - Add-on
+  summary: Reorder add-ons
+  operationId: reorderAddons
+  description: >-
+    Admin only. Backs drag and drop in the admin list. Writes every sortOrder
+    in one transaction — on any error nothing changes. Returns the full list
+    in its new order.
+  security:
+    - bearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/reorder-addons-request.schema.yaml'
+  responses:
+    '200':
+      description: Reordered addon successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/addon-list-response.schema.yaml'
+    '400':
+      description: >-
+        The list doesn't match the add-ons in the database — one is missing,
+        or an id is unknown or extra.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Reorder must list every add-on exactly once
+            timestamp: '2025-05-29T10:00:00Z'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: >-
+        items is empty, an id or sortOrder appears twice, or a sortOrder is
+        not an integer ≥ 0.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Reorder must list every add-on exactly once
+            timestamp: '2025-05-29T10:00:00Z'

@@ -1,0 +1,32 @@
+type: object
+description: >-
+  The full add-on list in its new order. Must include every existing add-on
+  exactly once, with unique ids and unique sortOrder values. The admin UI
+  sends the list index as sortOrder (0, 1, 2…).
+required:
+  - items
+properties:
+  items:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required:
+        - id
+        - sortOrder
+      properties:
+        id:
+          type: string
+          example: cmvv6r16x0001q0fgeilw6ubo
+        sortOrder:
+          type: integer
+          minimum: 0
+          example: 0
+example:
+  items:
+    - id: cmvv6r16x0001q0fgeilw6ubo
+      sortOrder: 0
+    - id: cmvv64vho0003g4fgl9cwdj1x
+      sortOrder: 1
+    - id: cmvv64vht0004g4fg1vf8mphc
+      sortOrder: 2

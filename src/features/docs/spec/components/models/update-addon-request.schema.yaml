@@ -1,0 +1,26 @@
+type: object
+description: >-
+  Send at least one field. code and sortOrder are not editable here — they
+  are stripped, so a body with only those is an empty update (422).
+minProperties: 1
+properties:
+  pricingType:
+    type: string
+    enum: [PER_ORDER, PER_TRAVELLER, PER_TRAVELLER_PER_DAY]
+    example: PER_TRAVELLER
+  price:
+    type: integer
+    minimum: 1
+    maximum: 100000000
+    description: Gross unit price in **satang**. Affects new quotes only.
+    example: 2500
+  coverageAmount:
+    type: integer
+    nullable: true
+    minimum: 1
+    maximum: 100000000
+    description: Extra sum insured in **satang**; null clears it.
+    example: null
+  isActive:
+    type: boolean
+    example: true

@@ -1,7 +1,6 @@
 # Add-on
 
-> Status: **Spec — not built yet.** Built before [Plan](plan.md). Code will live in
-> `src/features/addon/`.
+> Status: **Built** — code in `src/features/addon/`. Built before [Plan](plan.md).
 
 ## Purpose
 
@@ -92,7 +91,7 @@ Addon
 
 `/reorder` is registered before `/:id`, otherwise Express matches `reorder` as an id.
 
-Shapes: OpenAPI at `/docs`, once manually tested.
+Shapes: OpenAPI at `/docs` (`src/features/docs/spec/paths/addon/`).
 
 ## Interactions
 

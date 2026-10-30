@@ -14,6 +14,8 @@ tags:
     description: Authentication
   - name: Country
     description: Countries available as travel-insurance coverage
+  - name: Add-on
+    description: Optional extras bought on top of a plan (admin catalogue)
 
 paths:
   /health:
@@ -44,6 +46,12 @@ paths:
     $ref: './paths/country/admin-countries.yaml'
   /admin/countries/{id}:
     $ref: './paths/country/country-by-id.yaml'
+  /admin/addons:
+    $ref: './paths/addon/admin-addons.yaml'
+  /admin/addons/reorder:
+    $ref: './paths/addon/addon-reorder.yaml'
+  /admin/addons/{id}:
+    $ref: './paths/addon/addon-by-id.yaml'
 
 components:
   securitySchemes:
@@ -87,6 +95,18 @@ components:
       $ref: './components/models/country-response.schema.yaml'
     UpdateCountryRequest:
       $ref: './components/models/update-country-request.schema.yaml'
+    Addon:
+      $ref: './components/models/addon.schema.yaml'
+    AddonListResponse:
+      $ref: './components/models/addon-list-response.schema.yaml'
+    AddonResponse:
+      $ref: './components/models/addon-response.schema.yaml'
+    CreateAddonRequest:
+      $ref: './components/models/create-addon-request.schema.yaml'
+    UpdateAddonRequest:
+      $ref: './components/models/update-addon-request.schema.yaml'
+    ReorderAddonsRequest:
+      $ref: './components/models/reorder-addons-request.schema.yaml'
   responses:
     SuccessResponse:
       $ref: './components/responses/success.response.yaml'

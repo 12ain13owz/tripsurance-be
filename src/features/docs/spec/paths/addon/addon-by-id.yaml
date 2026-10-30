@@ -1,0 +1,101 @@
+get:
+  tags:
+    - Add-on
+  summary: Get add-on
+  operationId: getAddon
+  description: Admin only.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Add-on row id (cuid).
+      example: cmvv64vho0003g4fgl9cwdj1x
+  responses:
+    '200':
+      description: Fetched addon successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/addon-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No add-on with this id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Add-on not found
+            timestamp: '2025-05-29T10:00:00Z'
+patch:
+  tags:
+    - Add-on
+  summary: Update add-on
+  operationId: updateAddon
+  description: >-
+    Admin only. Updates any of pricingType, price, coverageAmount, isActive.
+    code never changes and order is changed only through PATCH
+    /admin/addons/reorder. Add-ons are never deleted — set isActive to false.
+    A price change affects new quotes only; orders keep their own snapshot.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Add-on row id (cuid).
+      example: cmvv64vho0003g4fgl9cwdj1x
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/update-addon-request.schema.yaml'
+  responses:
+    '200':
+      description: Updated addon successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/addon-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No add-on with this id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Add-on not found
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: Empty body (after stripping non-editable fields) or an invalid field.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Nothing to update
+            timestamp: '2025-05-29T10:00:00Z'

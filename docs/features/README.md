@@ -7,7 +7,7 @@ AI can understand a feature without reading its code.
 | ------------------ | ------------------------ | -------------------- |
 | Auth (admin)       | [auth.md](auth.md)       | Built                |
 | Country            | [country.md](country.md) | Built                |
-| Add-on             | [addon.md](addon.md)     | Spec — not built yet |
+| Add-on             | [addon.md](addon.md)     | Built                |
 | Plan (single trip) | [plan.md](plan.md)       | Spec — not built yet |
 
 Order of work and project-wide decisions live in the root `ROADMAP.md`, not here.
