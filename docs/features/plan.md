@@ -37,7 +37,7 @@ Plan
   code       String  @unique            // stable slug, e.g. "asia-basic"
   type       PlanType @default(SINGLE_TRIP)
   isActive   Boolean @default(false)    // new plans start hidden until reviewed
-  sortOrder  Int     @default(0)        // storefront order, ascending
+  sortOrder  Int     @default(0)        // storefront order; set by the server, changed via reorder
   createdAt, updatedAt
 
 PlanPriceTier                           // price per traveller by trip length
@@ -118,23 +118,27 @@ Adding a category = add it to the constant + FE i18n in the same change.
 16. The public API only ever returns active plans.
 17. Lists are sorted by `sortOrder` ascending, then `code`. Nested add-ons follow the add-on's own
     `sortOrder`.
+18. Admins never type `sortOrder` — same rules as [Add-on](addon.md) (rules 9–10): a new plan is
+    placed **last**, and order changes only through `PATCH /admin/plans/reorder` with every plan
+    listed once as `{ id, sortOrder }` (400 otherwise, one transaction).
 
 ### Updates
 
-18. `PATCH /admin/plans/:id` accepts any of `isActive`, `sortOrder`, `tiers`, `coverages`,
-    `countryIds`, `addonIds`. Each list sent **replaces** that list entirely (in one transaction); a
-    list not sent is left untouched.
-19. Changing a price affects new quotes only — orders keep their own snapshot.
+19. `PATCH /admin/plans/:id` accepts any of `isActive`, `tiers`, `coverages`, `countryIds`,
+    `addonIds`. Each list sent **replaces** that list entirely (in one transaction); a list not sent
+    is left untouched.
+20. Changing a price affects new quotes only — orders keep their own snapshot.
 
 ## Endpoints
 
-| Method | Path               | Who    | What                                                                                                |
-| ------ | ------------------ | ------ | --------------------------------------------------------------------------------------------------- |
-| GET    | `/admin/plans`     | admin  | All plans (active and inactive), with tiers, coverages, countries, add-ons                          |
-| GET    | `/admin/plans/:id` | admin  | One plan (404 if not found)                                                                         |
-| POST   | `/admin/plans`     | admin  | Create (`code`, `sortOrder?`, `tiers`, `coverages`, `countryIds`, `addonIds?`); 409 if `code` taken |
-| PATCH  | `/admin/plans/:id` | admin  | Update (rule 18); `code` and `type` not editable                                                    |
-| GET    | `/plans`           | public | Active plans; optional `?country=JP` to keep plans covering that country                            |
+| Method | Path                   | Who    | What                                                                                               |
+| ------ | ---------------------- | ------ | -------------------------------------------------------------------------------------------------- |
+| GET    | `/admin/plans`         | admin  | All plans (active and inactive), with tiers, coverages, countries, add-ons                         |
+| GET    | `/admin/plans/:id`     | admin  | One plan (404 if not found)                                                                        |
+| POST   | `/admin/plans`         | admin  | Create (`code`, `tiers`, `coverages`, `countryIds`, `addonIds?`); placed last; 409 if `code` taken |
+| PATCH  | `/admin/plans/reorder` | admin  | Reorder all plans (rule 18); registered before `/:id`                                              |
+| PATCH  | `/admin/plans/:id`     | admin  | Update (rule 19); `code`, `type` and `sortOrder` not editable                                      |
+| GET    | `/plans`               | public | Active plans; optional `?country=JP` to keep plans covering that country                           |
 
 Response shape (both audiences): `id`, `code`, `type`, `tiers[]`, `coverages[]`, countries as
 `isoCode`s, and `addons[]` (`code`, `pricingType`, `price`, `coverageAmount`). Admin also gets

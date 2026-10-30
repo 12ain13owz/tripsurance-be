@@ -41,7 +41,7 @@ Addon
   price           Int                    // satang, gross (incl. stamp duty + VAT)
   coverageAmount  Int?                   // satang; extra sum insured, if the add-on has one
   isActive        Boolean @default(false)
-  sortOrder       Int     @default(0)
+  sortOrder       Int     @default(0)    // set by the server, changed only via reorder
   createdAt, updatedAt
 ```
 
@@ -66,23 +66,31 @@ Addon
 
 6. New add-ons are created **inactive**; the admin activates them when ready.
 7. An inactive add-on stays linked to its plans but is hidden from consumers and can't be quoted.
-8. Lists are sorted by `sortOrder` ascending, then `code`. `sortOrder` is an integer ≥ 0; leave gaps
-   (10, 20, 30…) so a new add-on can slot in between without renumbering.
+8. Lists are sorted by `sortOrder` ascending, then `code`.
+9. Admins never type `sortOrder`. Create and update don't accept it: a new add-on is placed **last**
+   (current max `sortOrder` + 1, or 0 when it's the first).
+10. Order is changed only by `PATCH /admin/addons/reorder` (drag and drop in the admin UI). The body
+    lists **every** add-on exactly once as `{ id, sortOrder }`, ids and `sortOrder`s unique,
+    `sortOrder` an integer ≥ 0. Anything else (missing, extra or unknown id, duplicates) is 400 and
+    nothing changes. All rows are updated in one transaction.
 
 ### Updates
 
-9. `PATCH` accepts any of `pricingType`, `price`, `coverageAmount` (`null` clears it), `isActive`,
-   `sortOrder` — at least one. `code` is not editable.
-10. Changing a price affects new quotes only — orders keep their own snapshot.
+11. `PATCH /admin/addons/:id` accepts any of `pricingType`, `price`, `coverageAmount` (`null` clears
+    it), `isActive` — at least one. `code` and `sortOrder` are not editable here.
+12. Changing a price affects new quotes only — orders keep their own snapshot.
 
 ## Endpoints
 
-| Method | Path                | Who   | What                                          |
-| ------ | ------------------- | ----- | --------------------------------------------- |
-| GET    | `/admin/addons`     | admin | All add-ons (active and inactive), sorted     |
-| GET    | `/admin/addons/:id` | admin | One add-on (404 if not found)                 |
-| POST   | `/admin/addons`     | admin | Create (starts inactive); 409 if `code` taken |
-| PATCH  | `/admin/addons/:id` | admin | Update (rule 9); 404 if not found             |
+| Method | Path                    | Who   | What                                                       |
+| ------ | ----------------------- | ----- | ---------------------------------------------------------- |
+| GET    | `/admin/addons`         | admin | All add-ons (active and inactive), sorted                  |
+| GET    | `/admin/addons/:id`     | admin | One add-on (404 if not found)                              |
+| POST   | `/admin/addons`         | admin | Create (starts inactive, placed last); 409 if `code` taken |
+| PATCH  | `/admin/addons/reorder` | admin | Reorder all add-ons (rule 10); returns the sorted list     |
+| PATCH  | `/admin/addons/:id`     | admin | Update (rule 11); 404 if not found                         |
+
+`/reorder` is registered before `/:id`, otherwise Express matches `reorder` as an id.
 
 Shapes: OpenAPI at `/docs`, once manually tested.
 
@@ -91,7 +99,9 @@ Shapes: OpenAPI at `/docs`, once manually tested.
 - **Plan** — `PlanAddon` links plans to add-ons; public `/plans` embeds each plan's active add-ons.
 - **Order** (later) — snapshots each chosen add-on's `code`, `pricingType`, unit `price`, computed line
   amount and `coverageAmount`. Each add-on becomes its own Stripe line item.
-- **FE admin** — edits money in **baht**, converts to satang (× 100) before sending.
+- **FE admin** — edits money in **baht**, converts to satang (× 100) before sending. No `sortOrder`
+  field in the form; the list page reorders by drag and drop, sending the full list with
+  `sortOrder` = index. Drag is disabled while the list is filtered, since reorder needs every row.
 
 ## Seed
 
