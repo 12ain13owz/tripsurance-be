@@ -24,10 +24,8 @@ const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setT
 // ------------------------------------------------------------------------------
 
 const authenticateCredentials = async (email: string, password: string): Promise<User> => {
-  const user = await wrapUnexpected(async () => prisma.user.findUnique({ where: { email } }), {
-    operation: 'login',
-    metadata: { email },
-  })
+  const query = prisma.user.findUnique({ where: { email } })
+  const user = await wrapUnexpected(query, 'login', { email })
 
   const passwordMatch = await compare(password, user?.password ?? DUMMY_HASH)
 
@@ -58,10 +56,8 @@ const toSafeUser = (user: User): SafeUser => {
 }
 
 const findUserById = async (userId: string, operation: string): Promise<User> => {
-  const user = await wrapUnexpected(async () => prisma.user.findUnique({ where: { id: userId } }), {
-    operation: operation,
-    metadata: { userId },
-  })
+  const query = prisma.user.findUnique({ where: { id: userId } })
+  const user = await wrapUnexpected(query, operation, { userId })
 
   if (!user) {
     throw invalidToken(operation)
@@ -77,10 +73,10 @@ const findUserById = async (userId: string, operation: string): Promise<User> =>
 }
 
 const findUserByEmail = async (email: string, operation: string): Promise<User | null> => {
-  return wrapUnexpected(async () => prisma.user.findUnique({ where: { email } }), {
-    operation,
-    metadata: { email },
-  })
+  const query = prisma.user.findUnique({ where: { email } })
+  const user = await wrapUnexpected(query, operation, { email })
+
+  return user
 }
 
 const persistRefreshToken = async (
@@ -89,26 +85,20 @@ const persistRefreshToken = async (
   operation: string
 ): Promise<void> => {
   const { exp } = verifyRefreshToken(refreshToken)
+  const query = prisma.refreshToken.create({
+    data: { userId, tokenHash: hashToken(refreshToken), expiresAt: new Date(exp * 1000) },
+  })
 
-  await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.create({
-        data: { userId, tokenHash: hashToken(refreshToken), expiresAt: new Date(exp * 1000) },
-      }),
-    { operation, metadata: { userId } }
-  )
+  await wrapUnexpected(query, operation, { userId })
 }
 
 const revokeRefreshToken = async (refreshToken: string, operation: string): Promise<boolean> => {
   const tokenHash = hashToken(refreshToken)
-  const { count } = await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.updateMany({
-        where: { tokenHash, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-    { operation, metadata: { tokenHash } }
-  )
+  const query = prisma.refreshToken.updateMany({
+    where: { tokenHash, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
+  const { count } = await wrapUnexpected(query, operation, { tokenHash })
 
   return count > 0
 }
@@ -119,18 +109,16 @@ const revokeOtherRefreshTokens = async (
   operation: string
 ): Promise<void> => {
   const currentTokenHash = currentToken ? hashToken(currentToken) : null
-  await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.updateMany({
-        where: {
-          userId,
-          revokedAt: null,
-          ...(currentTokenHash ? { tokenHash: { not: currentTokenHash } } : {}),
-        },
-        data: { revokedAt: new Date() },
-      }),
-    { operation, metadata: { userId } }
-  )
+  const query = prisma.refreshToken.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+      ...(currentTokenHash ? { tokenHash: { not: currentTokenHash } } : {}),
+    },
+    data: { revokedAt: new Date() },
+  })
+
+  await wrapUnexpected(query, operation, { userId })
 }
 
 const invalidToken = (operation: string): AppError =>
@@ -218,7 +206,8 @@ export const changePassword = async (
   }
 
   const passwordHash = await hash(newPassword, SALT_ROUNDS)
-  await prisma.user.update({ where: { id: user.id }, data: { password: passwordHash } })
+  const query = prisma.user.update({ where: { id: user.id }, data: { password: passwordHash } })
+  await wrapUnexpected(query, 'changePassword', { userId })
   await revokeOtherRefreshTokens(userId, currentToken, 'changePassword')
 }
 
@@ -234,13 +223,10 @@ export const forgotPassword = async (email: string) => {
   const expiresInMs = parseDuration(env.RESET_TOKEN_EXPIRES)
   const expiresAt = new Date(Date.now() + expiresInMs)
 
-  await wrapUnexpected(
-    async () =>
-      prisma.passwordResetToken.create({
-        data: { userId: user.id, tokenHash: hashToken(rawToken), expiresAt },
-      }),
-    { operation: 'forgotPassword', metadata: { userId: user.id } }
-  )
+  const query = prisma.passwordResetToken.create({
+    data: { userId: user.id, tokenHash: hashToken(rawToken), expiresAt },
+  })
+  await wrapUnexpected(query, 'forgotPassword', { userId: user.id })
 
   const resetUrl = `${env.FRONTEND_URL}/admin/reset-password?token=${rawToken}`
   const { subject, html } = passwordResetEmail({
@@ -254,14 +240,13 @@ export const forgotPassword = async (email: string) => {
 
 export const resetPassword = async (token: string, newPassword: string): Promise<AuthSession> => {
   const tokenHash = hashToken(token)
-  const passwordResetToken = await wrapUnexpected(
-    async () =>
-      prisma.passwordResetToken.findUnique({
-        where: { tokenHash },
-        include: { user: true },
-      }),
-    { operation: 'resetPassword', metadata: { tokenHash } }
-  )
+  const passwordResetTokenQuery = prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  })
+  const passwordResetToken = await wrapUnexpected(passwordResetTokenQuery, 'resetPassword', {
+    tokenHash,
+  })
 
   if (!passwordResetToken) {
     throw invalidToken('resetPassword')
@@ -282,21 +267,15 @@ export const resetPassword = async (token: string, newPassword: string): Promise
 
   const user = passwordResetToken.user
   const passwordHash = await hash(newPassword, SALT_ROUNDS)
-
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: user.id },
-      data: { password: passwordHash },
-    })
-    await tx.passwordResetToken.update({
-      where: { tokenHash },
-      data: { usedAt: new Date() },
-    })
+  const updatePasswordQuery = prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { password: passwordHash } })
+    await tx.passwordResetToken.update({ where: { tokenHash }, data: { usedAt: new Date() } })
     await tx.refreshToken.updateMany({
       where: { userId: user.id, revokedAt: null },
       data: { revokedAt: new Date() },
     })
   })
+  await wrapUnexpected(updatePasswordQuery, 'resetPassword', { userId: user.id })
 
   const accessToken = signAccessToken(user.id)
   const refreshToken = signRefreshToken(user.id)
@@ -311,15 +290,11 @@ export const listSessions = async (
   currentToken: string | null
 ): Promise<SessionSummary[]> => {
   const currentTokenHash = currentToken ? hashToken(currentToken) : null
-
-  const sessions = await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.findMany({
-        where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
-        orderBy: { createdAt: 'desc' },
-      }),
-    { operation: 'listSessions', metadata: { userId } }
-  )
+  const query = prisma.refreshToken.findMany({
+    where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: 'desc' },
+  })
+  const sessions = await wrapUnexpected(query, 'listSessions', { userId })
 
   const data: SessionSummary[] = sessions.map((session) => ({
     id: session.id,
@@ -332,14 +307,11 @@ export const listSessions = async (
 }
 
 export const revokeSession = async (userId: string, sessionId: string): Promise<void> => {
-  const { count } = await wrapUnexpected(
-    async () =>
-      prisma.refreshToken.updateMany({
-        where: { id: sessionId, userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-    { operation: 'revokeSession', metadata: { userId, sessionId } }
-  )
+  const query = prisma.refreshToken.updateMany({
+    where: { id: sessionId, userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  })
+  const { count } = await wrapUnexpected(query, 'revokeSession', { userId, sessionId })
 
   if (count === 0) {
     throw new AppError(AUTH_ERRORS.SESSION_NOT_FOUND, HttpStatus.NOT_FOUND, ErrorSeverity.WARN)
@@ -362,18 +334,15 @@ export const cleanupExpiredTokens = async (
   passwordResetTokens: number
 }> => {
   const cutoff = new Date(Date.now() - retentionMs)
-  const [refreshTokens, passwordResetTokens] = await wrapUnexpected(
-    async () =>
-      prisma.$transaction([
-        prisma.refreshToken.deleteMany({
-          where: { OR: [{ revokedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }] },
-        }),
-        prisma.passwordResetToken.deleteMany({
-          where: { OR: [{ usedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }] },
-        }),
-      ]),
-    { operation: 'cleanupExpiredTokens' }
-  )
+  const query = prisma.$transaction([
+    prisma.refreshToken.deleteMany({
+      where: { OR: [{ revokedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }] },
+    }),
+    prisma.passwordResetToken.deleteMany({
+      where: { OR: [{ usedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }] },
+    }),
+  ])
+  const [refreshTokens, passwordResetTokens] = await wrapUnexpected(query, 'cleanupExpiredTokens')
 
   return { refreshTokens: refreshTokens.count, passwordResetTokens: passwordResetTokens.count }
 }

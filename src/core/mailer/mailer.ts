@@ -14,17 +14,16 @@ export const sendMail = async ({ to, subject, html }: SendMail): Promise<void> =
     html,
   }
 
-  await wrapUnexpected(
-    async () => {
-      const { error } = await resend.emails.send(mailConfig)
-      if (error) {
-        throw new Error(error.message)
-      }
-    },
-    {
-      operation: 'sendMail',
-      message: ERRORS.MAIL.SEND_FAILED,
-      metadata: { from: mailConfig.from, to: mailConfig.to },
+  const send = (async () => {
+    const { error } = await resend.emails.send(mailConfig)
+    if (error) {
+      throw new Error(error.message)
     }
+  })()
+  await wrapUnexpected(
+    send,
+    'sendMail',
+    { from: mailConfig.from, to: mailConfig.to },
+    ERRORS.MAIL.SEND_FAILED
   )
 }

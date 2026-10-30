@@ -8,10 +8,8 @@ import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 // ------------------------------------------------------------------------------
 
 const findById = async (id: string): Promise<Country> => {
-  const country = await wrapUnexpected(async () => prisma.country.findUnique({ where: { id } }), {
-    operation: 'findById',
-    metadata: { id },
-  })
+  const query = prisma.country.findUnique({ where: { id } })
+  const country = await wrapUnexpected(query, 'findById', { id })
 
   if (!country) {
     throw new AppError(ERRORS.UTIL.notFound('Country'), HttpStatus.NOT_FOUND, ErrorSeverity.WARN)
@@ -27,28 +25,23 @@ const findById = async (id: string): Promise<Country> => {
 // ------------------------------------------------------------------------------
 
 export const list = async (): Promise<Country[]> => {
-  const countries = await wrapUnexpected(
-    async () => prisma.country.findMany({ orderBy: { isoCode: 'asc' } }),
-    { operation: 'listCountry' }
-  )
+  const query = prisma.country.findMany({ orderBy: { isoCode: 'asc' } })
+  const countries = await wrapUnexpected(query, 'listCountry')
+
   return countries
 }
 
 export const listActive = async (): Promise<Country[]> => {
-  const countries = await wrapUnexpected(
-    async () => prisma.country.findMany({ where: { isActive: true }, orderBy: { isoCode: 'asc' } }),
-    { operation: 'listActiveCountry' }
-  )
+  const query = prisma.country.findMany({ where: { isActive: true }, orderBy: { isoCode: 'asc' } })
+  const countries = await wrapUnexpected(query, 'listActiveCountry')
   return countries
 }
 
 export const update = async (id: string, isActive: boolean): Promise<Country> => {
   await findById(id)
 
-  const country = await wrapUnexpected(
-    async () => prisma.country.update({ where: { id }, data: { isActive } }),
-    { operation: 'updateCountry', metadata: { id, isActive } }
-  )
+  const query = prisma.country.update({ where: { id }, data: { isActive } })
+  const country = await wrapUnexpected(query, 'updateCountry', { id, isActive })
 
   const data: Country = country
   return data
