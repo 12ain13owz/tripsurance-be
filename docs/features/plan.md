@@ -63,20 +63,31 @@ PlanAddon                               // which add-ons the plan offers
 ```
 
 `PlanCountry` and `PlanAddon` belong to this feature: the master tables (`Country`, `Addon`) don't
-know which plans use them.
+know which plans use them. Prisma still requires a back-relation field on both sides, so
+`country.prisma` and `addon.prisma` each get one line (`planCountries PlanCountry[]`,
+`planAddons PlanAddon[]`) — schema only; the country and add-on features never read it.
 
 ### Coverage categories
 
-`categoryKey` is checked against a fixed BE constant list (`PLAN_COVERAGE_CATEGORIES`), not free
-text — every key needs an FE i18n label, so admins can't invent one. Initial list (to confirm):
+`categoryKey` is checked against a fixed BE constant list (`PLAN_COVERAGE_CATEGORIES` in
+`src/features/plan/plan.const.ts`), not free text — every key needs an FE i18n label, so admins
+can't invent one. It's stored as a `String`, not a Prisma enum, so adding a category needs no
+migration:
 
 `MEDICAL_EXPENSES`, `ACCIDENTAL_DEATH_DISABILITY`, `EMERGENCY_EVACUATION`, `REPATRIATION`,
 `TRIP_CANCELLATION`, `TRIP_CURTAILMENT`, `FLIGHT_DELAY`, `BAGGAGE_DELAY`, `BAGGAGE_LOSS`,
 `PERSONAL_LIABILITY`.
 
+The list's order is the **display order**: responses return `coverages[]` sorted by it, so the
+storefront and the policy PDF list coverages the same way.
+
 Adding a category = add it to the constant + FE i18n in the same change.
 
 ## Business rules
+
+Rules that only look at the request (code format, tiers, coverages) are checked by request
+validation and fail with **422**. Rules that need the database fail in the service: `code` taken
+→ 409, unknown country or add-on id → 400, plan not found → 404.
 
 ### Code
 
@@ -84,6 +95,9 @@ Adding a category = add it to the constant + FE i18n in the same change.
 2. `code` is **set on create and never changes** — update requests can't change it.
 
 ### Price tiers
+
+Breakpoints are **free per plan** — plans don't have to share them. The seed uses the same
+breakpoints for every plan by convention only.
 
 3. A plan has at least 1 tier.
 4. The first tier starts at `minDays = 1`.
@@ -102,20 +116,22 @@ Adding a category = add it to the constant + FE i18n in the same change.
 
 ### Countries
 
-11. At least 1 country; ids must exist. Duplicates are ignored.
+11. At least 1 country; ids must exist (400 otherwise). Duplicates are ignored.
 12. A plan may keep a country that has since been deactivated, but the **public** response only
     lists active countries.
 
 ### Add-ons
 
-13. Zero or more add-ons; ids must exist. Duplicates are ignored.
+13. Zero or more add-ons; ids must exist (400 otherwise). Duplicates are ignored.
 14. A plan may keep an add-on that has since been deactivated, but the **public** response only
     lists active add-ons — same rule as countries.
 
 ### Activation & order
 
 15. New plans are created **inactive**. The admin toggles `isActive` when ready.
-16. The public API only ever returns active plans.
+16. The public API only ever returns active plans. `GET /plans?country=JP` (ISO 3166-1 alpha-2,
+    uppercase) keeps only plans covering that country; an unknown or inactive country returns an
+    empty list, not 404.
 17. Lists are sorted by `sortOrder` ascending, then `code`. Nested add-ons follow the add-on's own
     `sortOrder`.
 18. Admins never type `sortOrder` — same rules as [Add-on](addon.md) (rules 9–10): a new plan is
@@ -138,7 +154,7 @@ Adding a category = add it to the constant + FE i18n in the same change.
 | POST   | `/admin/plans`         | admin  | Create (`code`, `tiers`, `coverages`, `countryIds`, `addonIds?`); placed last; 409 if `code` taken |
 | PATCH  | `/admin/plans/reorder` | admin  | Reorder all plans (rule 18); registered before `/:id`                                              |
 | PATCH  | `/admin/plans/:id`     | admin  | Update (rule 19); `code`, `type` and `sortOrder` not editable                                      |
-| GET    | `/plans`               | public | Active plans; optional `?country=JP` to keep plans covering that country                           |
+| GET    | `/plans`               | public | Active plans; optional `?country=JP` (rule 16)                                                     |
 
 Response shape (both audiences): `id`, `code`, `type`, `tiers[]`, `coverages[]`, countries as
 `isoCode`s, and `addons[]` (`code`, `pricingType`, `price`, `coverageAmount`). Admin also gets
@@ -160,11 +176,6 @@ Exact shapes go into OpenAPI after manual testing.
 
 `prisma/seeds/plan.ts`, idempotent upsert by `code`, runs after the add-on seed, e.g.:
 
-- `asia-basic` — Asia countries; tiers 1–7 / 8–15 / 16–31 / 32–90 / 91–180 days; a couple of add-ons.
+- `asia-basic` — Asian countries (a hardcoded `isoCode` list in the seed, since `Country` has no
+  region); tiers 1–7 / 8–15 / 16–31 / 32–90 / 91–180 days; a couple of add-ons.
 - `worldwide-plus` — all countries; same tier breakpoints, higher prices and coverage; all add-ons.
-
-## Open questions
-
-1. **Coverage category list** above — confirm or replace with the insurer's real categories.
-2. **Tier breakpoints** — free per plan (as specified), or one fixed set shared by all plans? Proposal:
-   free per plan; the seed uses the same breakpoints by convention.
