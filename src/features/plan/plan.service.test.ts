@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Addon, Plan, PlanCoverage, PlanPriceTier } from '@/generated/prisma/client'
 import { ERRORS, HttpStatus } from '@/shared/constants'
 import { PLAN_ERRORS } from './plan.const'
-import { create, get, list, reorder, update } from './plan.service'
+import { create, get, list, listActive, reorder, update } from './plan.service'
 import type { CreatePlanInput } from './plan.schema'
-import type { PlanAdminData } from './plan.type'
+import type { PlanAdminData, PlanData } from './plan.type'
 
 // Row shape returned by Prisma with the service's PLAN_INCLUDE
 type PlanRow = Plan & {
@@ -14,6 +14,7 @@ type PlanRow = Plan & {
   addons: { addon: Pick<Addon, 'code' | 'pricingType' | 'price' | 'coverageAmount'> }[]
 }
 interface FindManyArgs {
+  where?: unknown
   orderBy?: unknown
   include?: unknown
   select?: { id: true }
@@ -119,6 +120,15 @@ const planData: PlanAdminData = {
   countries: ['JP', 'KR'],
   addons: [addonRow],
 }
+const publicData: PlanData = {
+  id: planData.id,
+  code: planData.code,
+  type: planData.type,
+  tiers: planData.tiers,
+  coverages: planData.coverages,
+  countries: planData.countries,
+  addons: planData.addons,
+}
 const secondRow: PlanRow = { ...planRow, id: 'plan-2', code: 'worldwide-plus', sortOrder: 1 }
 
 const createInput: CreatePlanInput = {
@@ -173,6 +183,57 @@ describe('list', () => {
     findManyMock.mockRejectedValue(dbError)
 
     await expect(list()).rejects.toMatchObject(internalError)
+  })
+})
+
+describe('listActive', () => {
+  it('returns consumer fields only — no isActive, sortOrder or timestamps', async () => {
+    findManyMock.mockResolvedValue([planRow])
+
+    const result = await listActive()
+
+    expect(result).toEqual([publicData])
+    expect(result[0]).not.toHaveProperty('isActive')
+    expect(result[0]).not.toHaveProperty('sortOrder')
+    expect(result[0]).not.toHaveProperty('createdAt')
+  })
+
+  it('queries active plans in sortOrder, then code, with no country filter by default', async () => {
+    findManyMock.mockResolvedValue([])
+
+    await listActive()
+
+    const args = findManyMock.mock.calls[0][0]
+    expect(args.where).toEqual({ isActive: true, countries: undefined })
+    expect(args.orderBy).toEqual([{ sortOrder: 'asc' }, { code: 'asc' }])
+  })
+
+  it('keeps only plans covering the given country while it is active', async () => {
+    findManyMock.mockResolvedValue([planRow])
+
+    await listActive('JP')
+
+    expect(findManyMock.mock.calls[0][0].where).toEqual({
+      isActive: true,
+      countries: { some: { country: { isoCode: 'JP', isActive: true } } },
+    })
+  })
+
+  it('limits nested countries and add-ons to active ones', async () => {
+    findManyMock.mockResolvedValue([])
+
+    await listActive()
+
+    expect(findManyMock.mock.calls[0][0].include).toMatchObject({
+      countries: { where: { country: { isActive: true } } },
+      addons: { where: { addon: { isActive: true } } },
+    })
+  })
+
+  it('wraps an unexpected database error as a 500 AppError', async () => {
+    findManyMock.mockRejectedValue(dbError)
+
+    await expect(listActive('JP')).rejects.toMatchObject(internalError)
   })
 })
 
@@ -389,12 +450,10 @@ describe('reorder', () => {
   }
 
   it('writes every sortOrder in one transaction and returns the re-sorted list', async () => {
-    findManyMock
-      .mockResolvedValueOnce(existingIds)
-      .mockResolvedValueOnce([
-        { ...secondRow, sortOrder: 0 },
-        { ...planRow, sortOrder: 1 },
-      ])
+    findManyMock.mockResolvedValueOnce(existingIds).mockResolvedValueOnce([
+      { ...secondRow, sortOrder: 0 },
+      { ...planRow, sortOrder: 1 },
+    ])
 
     const result = await reorder({
       items: [

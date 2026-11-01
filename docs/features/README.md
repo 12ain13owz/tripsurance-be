@@ -3,12 +3,12 @@
 One file per feature: **what it does and the rules it enforces**, in plain language, so a human or an
 AI can understand a feature without reading its code.
 
-| Feature            | Doc                      | Status               |
-| ------------------ | ------------------------ | -------------------- |
-| Auth (admin)       | [auth.md](auth.md)       | Built                |
-| Country            | [country.md](country.md) | Built                |
-| Add-on             | [addon.md](addon.md)     | Built                |
-| Plan (single trip) | [plan.md](plan.md)       | Built                |
+| Feature            | Doc                      | Status |
+| ------------------ | ------------------------ | ------ |
+| Auth (admin)       | [auth.md](auth.md)       | Built  |
+| Country            | [country.md](country.md) | Built  |
+| Add-on             | [addon.md](addon.md)     | Built  |
+| Plan (single trip) | [plan.md](plan.md)       | Built  |
 
 Order of work and project-wide decisions live in the root `ROADMAP.md`, not here.
 

@@ -6,9 +6,10 @@ import { ERRORS, ErrorSeverity, HttpStatus, SUCCESS } from '@/shared/constants'
 import type { AppResponse } from '@/shared/types'
 import { MAX_COVERAGE_AMOUNT, PLAN_ERRORS } from './plan.const'
 import type { CreatePlanInput, ReorderPlanInput, UpdatePlanInput } from './plan.schema'
-import type { PlanAdminData } from './plan.type'
+import type { PlanAdminData, PlanData } from './plan.type'
 
 const listMock = vi.fn<() => Promise<PlanAdminData[]>>()
+const listActiveMock = vi.fn<(country?: string) => Promise<PlanData[]>>()
 const getMock = vi.fn<(id: string) => Promise<PlanAdminData>>()
 const createMock = vi.fn<(input: CreatePlanInput) => Promise<PlanAdminData>>()
 const updateMock = vi.fn<(id: string, input: UpdatePlanInput) => Promise<PlanAdminData>>()
@@ -16,6 +17,7 @@ const reorderMock = vi.fn<(input: ReorderPlanInput) => Promise<PlanAdminData[]>>
 
 vi.mock('./plan.service', () => ({
   list: async () => listMock(),
+  listActive: async (country?: string) => listActiveMock(country),
   get: async (id: string) => getMock(id),
   create: async (input: CreatePlanInput) => createMock(input),
   update: async (id: string, input: UpdatePlanInput) => updateMock(id, input),
@@ -72,7 +74,10 @@ const invalidLists = [
   ['tiers overlap', { tiers: [tiers[0], { ...tiers[1], minDays: 4 }] }],
   ['a tier ends before it starts', { tiers: [tiers[0], { ...tiers[1], maxDays: 4 }] }],
   ['a tier goes past 365 days', { tiers: [{ ...tiers[0], maxDays: 366 }] }],
-  ['a price is a decimal (baht sent instead of satang)', { tiers: [{ ...tiers[0], pricePerTraveller: 199.5 }] }],
+  [
+    'a price is a decimal (baht sent instead of satang)',
+    { tiers: [{ ...tiers[0], pricePerTraveller: 199.5 }] },
+  ],
   ['coverages is empty', { coverages: [] }],
   ['a coverage category is unknown', { coverages: [{ categoryKey: 'PET_CARE', amount: 100 }] }],
   [
@@ -93,11 +98,64 @@ const invalidLists = [
 
 beforeEach(() => {
   listMock.mockReset()
+  listActiveMock.mockReset()
   getMock.mockReset()
   createMock.mockReset()
   updateMock.mockReset()
   reorderMock.mockReset()
   verifyAccessTokenMock.mockReset().mockReturnValue({ sub: 'user-1', iat: 0, exp: 1893456000 })
+})
+
+describe('GET /plans', () => {
+  const publicPlan: PlanData = {
+    id: plan.id,
+    code: plan.code,
+    type: plan.type,
+    tiers: plan.tiers,
+    coverages: plan.coverages,
+    countries: plan.countries,
+    addons: plan.addons,
+  }
+
+  it('returns 200 with active plans and needs no bearer token', async () => {
+    listActiveMock.mockResolvedValue([publicPlan])
+
+    const res = await request(app).get('/plans')
+    const body = res.body as AppResponse<PlanData[]>
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(body.message).toBe(SUCCESS.UTIL.list('plan'))
+    expect(body.data).toEqual([publicPlan])
+    expect(listActiveMock).toHaveBeenCalledWith(undefined)
+    expect(verifyAccessTokenMock).not.toHaveBeenCalled()
+  })
+
+  it('passes the country filter to the service', async () => {
+    listActiveMock.mockResolvedValue([])
+
+    const res = await request(app).get('/plans').query({ country: 'JP' })
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(listActiveMock).toHaveBeenCalledWith('JP')
+  })
+
+  it.each([
+    ['lowercase', 'jp'],
+    ['three letters', 'JPN'],
+    ['empty', ''],
+  ])('returns 422 and never calls the service when country is %s', async (_label, country) => {
+    const res = await request(app).get('/plans').query({ country })
+
+    expect(res.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY)
+    expect(listActiveMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 422 when country is sent more than once', async () => {
+    const res = await request(app).get('/plans?country=JP&country=KR')
+
+    expect(res.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY)
+    expect(listActiveMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('GET /admin/plans', () => {
