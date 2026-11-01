@@ -1,0 +1,57 @@
+enum PlanType {
+  SINGLE_TRIP
+}
+
+model Plan {
+  id        String          @id @default(cuid())
+  code      String          @unique // stable slug, never renamed; keys FE i18n copy
+  type      PlanType        @default(SINGLE_TRIP)
+  isActive  Boolean         @default(false)
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  tiers     PlanPriceTier[]
+  coverages PlanCoverage[]
+  countries PlanCountry[]
+  addons    PlanAddon[]
+}
+
+model PlanPriceTier {
+  id                String @id @default(cuid())
+  planId            String
+  plan              Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  minDays           Int
+  maxDays           Int
+  pricePerTraveller Int // satang, gross (incl. stamp duty + VAT)
+
+  @@unique([planId, minDays])
+}
+
+model PlanCoverage {
+  id          String @id @default(cuid())
+  planId      String
+  plan        Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  categoryKey String // one of PLAN_COVERAGE_CATEGORIES (src/features/plan/plan.const.ts)
+  amount      Int // satang, sum insured
+
+  @@unique([planId, categoryKey])
+}
+
+model PlanCountry {
+  planId    String
+  plan      Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  countryId String
+  country   Country @relation(fields: [countryId], references: [id])
+
+  @@id([planId, countryId])
+  @@index([countryId]) // GET /plans?country= looks plans up by country
+}
+
+model PlanAddon {
+  planId  String
+  plan    Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  addonId String
+  addon   Addon  @relation(fields: [addonId], references: [id])
+
+  @@id([planId, addonId])
+}
