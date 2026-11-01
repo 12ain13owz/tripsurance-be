@@ -54,6 +54,8 @@ paths:
     $ref: './paths/addon/addon-reorder.yaml'
   /admin/addons/{id}:
     $ref: './paths/addon/addon-by-id.yaml'
+  /plans:
+    $ref: './paths/plan/plans.yaml'
   /admin/plans:
     $ref: './paths/plan/admin-plans.yaml'
   /admin/plans/reorder:
@@ -131,6 +133,10 @@ components:
       $ref: './components/models/update-plan-request.schema.yaml'
     ReorderPlansRequest:
       $ref: './components/models/reorder-plans-request.schema.yaml'
+    PublicPlan:
+      $ref: './components/models/public-plan.schema.yaml'
+    PublicPlanListResponse:
+      $ref: './components/models/public-plan-list-response.schema.yaml'
   responses:
     SuccessResponse:
       $ref: './components/responses/success.response.yaml'

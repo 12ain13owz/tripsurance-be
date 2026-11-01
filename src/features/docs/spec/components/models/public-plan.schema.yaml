@@ -1,0 +1,60 @@
+type: object
+description: >-
+  A plan as consumers see it — active plans only, without admin fields
+  (isActive, sortOrder, timestamps). Name, description and coverage labels
+  come from FE i18n keyed by code. All money fields are integer **satang**
+  (1 THB = 100).
+properties:
+  id:
+    type: string
+    example: cmvx2k1ab0000q0fg8h3d7e2c
+  code:
+    type: string
+    description: Stable slug; FE i18n keys the plan's copy by it.
+    example: asia-basic
+  type:
+    type: string
+    enum: [SINGLE_TRIP]
+    example: SINGLE_TRIP
+  tiers:
+    type: array
+    description: Ordered by minDays. The last tier's maxDays is the max trip length.
+    items:
+      $ref: './plan-price-tier.schema.yaml'
+  coverages:
+    type: array
+    description: Ordered by category (see categoryKey).
+    items:
+      $ref: './plan-coverage.schema.yaml'
+  countries:
+    type: array
+    description: >-
+      ISO 3166-1 alpha-2 codes of the **active** countries the plan covers,
+      ordered by code. Names come from the FE (Intl.DisplayNames).
+    items:
+      type: string
+    example: [JP, KR, TW]
+  addons:
+    type: array
+    description: >-
+      **Active** add-ons the plan offers, in the add-ons' own sortOrder. Copy
+      comes from FE i18n keyed by code.
+    items:
+      type: object
+      properties:
+        code:
+          type: string
+          example: baggage-plus
+        pricingType:
+          type: string
+          enum: [PER_ORDER, PER_TRAVELLER, PER_TRAVELLER_PER_DAY]
+          example: PER_TRAVELLER
+        price:
+          type: integer
+          description: Gross unit price in satang.
+          example: 9900
+        coverageAmount:
+          type: integer
+          nullable: true
+          description: Extra sum insured in satang, or null.
+          example: 1000000

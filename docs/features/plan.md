@@ -1,8 +1,7 @@
 # Plan
 
-> Status: **Admin API built; public `GET /plans` not built yet.** This slice covers single-trip
-> plans only; annual plans are the next slice (see `ROADMAP.md`). Built **after**
-> [Add-on](addon.md). Code lives in `src/features/plan/`.
+> Status: **Built.** This slice covers single-trip plans only; annual plans are the next slice
+> (see `ROADMAP.md`). Built **after** [Add-on](addon.md). Code lives in `src/features/plan/`.
 
 ## Purpose
 

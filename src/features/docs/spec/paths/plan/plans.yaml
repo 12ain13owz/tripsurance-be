@@ -1,0 +1,38 @@
+get:
+  tags:
+    - Plan
+  summary: List active plans
+  operationId: listActivePlans
+  description: >-
+    Public — no bearer token required. Consumer-facing plan listing. Returns
+    only plans with isActive true, ordered by sortOrder then code; nested
+    countries and add-ons are limited to active ones. Admins list every plan
+    through GET /admin/plans.
+  parameters:
+    - in: query
+      name: country
+      required: false
+      schema:
+        type: string
+        pattern: '^[A-Z]{2}$'
+      description: >-
+        ISO 3166-1 alpha-2 code, uppercase. Keeps only plans covering that
+        country. An unknown or inactive country returns an empty list, not
+        404.
+      example: JP
+  responses:
+    '200':
+      description: Listed plan successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/public-plan-list-response.schema.yaml'
+    '422':
+      description: country is not two uppercase letters (e.g. jp, JPN).
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Invalid country format
+            timestamp: '2025-05-29T10:00:00Z'
