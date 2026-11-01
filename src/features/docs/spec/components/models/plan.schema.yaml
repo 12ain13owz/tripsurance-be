@@ -1,0 +1,81 @@
+type: object
+description: >-
+  An insurance package for a single trip. code is the unique, stable
+  identifier (FE i18n keys name, description and coverage labels by it) — id
+  is only for internal reference. Travel dates, travellers and the final
+  price belong to the order, not the plan. All money fields are integer
+  **satang** (1 THB = 100).
+properties:
+  id:
+    type: string
+    example: cmvx2k1ab0000q0fg8h3d7e2c
+  code:
+    type: string
+    description: Lowercase kebab-case slug, max 50 chars. Set on create, never changes.
+    example: asia-basic
+  type:
+    type: string
+    enum: [SINGLE_TRIP]
+    readOnly: true
+    example: SINGLE_TRIP
+  isActive:
+    type: boolean
+    description: Whether consumers can see it. New plans start inactive.
+    example: true
+  sortOrder:
+    type: integer
+    readOnly: true
+    description: >-
+      Display order, ascending. Set by the server — new plans go last;
+      change it only with PATCH /admin/plans/reorder.
+    example: 0
+  tiers:
+    type: array
+    description: Ordered by minDays.
+    items:
+      $ref: './plan-price-tier.schema.yaml'
+  coverages:
+    type: array
+    description: Ordered by category (see categoryKey).
+    items:
+      $ref: './plan-coverage.schema.yaml'
+  countries:
+    type: array
+    description: >-
+      ISO 3166-1 alpha-2 codes of every country the plan covers, including
+      ones since deactivated, ordered by code. Names come from the FE.
+    items:
+      type: string
+    example: [JP, KR, TW]
+  addons:
+    type: array
+    description: >-
+      Add-ons the plan offers, including ones since deactivated, in the
+      add-ons' own sortOrder.
+    items:
+      type: object
+      properties:
+        code:
+          type: string
+          example: baggage-plus
+        pricingType:
+          type: string
+          enum: [PER_ORDER, PER_TRAVELLER, PER_TRAVELLER_PER_DAY]
+          example: PER_TRAVELLER
+        price:
+          type: integer
+          description: Gross unit price in satang.
+          example: 9900
+        coverageAmount:
+          type: integer
+          nullable: true
+          description: Extra sum insured in satang, or null.
+          example: 1000000
+  createdAt:
+    type: string
+    format: date-time
+    example: '2026-11-01T09:00:00.000Z'
+  updatedAt:
+    type: string
+    format: date-time
+    example: '2026-11-01T09:00:00.000Z'

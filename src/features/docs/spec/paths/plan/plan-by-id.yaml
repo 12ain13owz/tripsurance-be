@@ -1,0 +1,111 @@
+get:
+  tags:
+    - Plan
+  summary: Get plan
+  operationId: getPlan
+  description: Admin only.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Plan row id (cuid).
+      example: cmvx2k1ab0000q0fg8h3d7e2c
+  responses:
+    '200':
+      description: Fetched plan successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/plan-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No plan with this id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Plan not found
+            timestamp: '2025-05-29T10:00:00Z'
+patch:
+  tags:
+    - Plan
+  summary: Update plan
+  operationId: updatePlan
+  description: >-
+    Admin only. Updates any of isActive, tiers, coverages, countryIds,
+    addonIds; each list sent replaces the old one. code and type never change
+    and order is changed only through PATCH /admin/plans/reorder. Plans are
+    never deleted — set isActive to false. A price change affects new quotes
+    only; orders keep their own snapshot.
+  security:
+    - bearerAuth: []
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema:
+        type: string
+      description: Plan row id (cuid).
+      example: cmvx2k1ab0000q0fg8h3d7e2c
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/update-plan-request.schema.yaml'
+  responses:
+    '200':
+      description: Updated plan successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/plan-response.schema.yaml'
+    '400':
+      description: A country or add-on id doesn't exist.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: One or more add-ons do not exist
+            timestamp: '2025-05-29T10:00:00Z'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '404':
+      description: No plan with this id.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Plan not found
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: Empty body (after stripping non-editable fields) or an invalid field.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Nothing to update
+            timestamp: '2025-05-29T10:00:00Z'

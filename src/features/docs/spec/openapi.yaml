@@ -16,6 +16,8 @@ tags:
     description: Countries available as travel-insurance coverage
   - name: Add-on
     description: Optional extras bought on top of a plan (admin catalogue)
+  - name: Plan
+    description: Insurance packages — price tiers, coverages, countries and add-ons
 
 paths:
   /health:
@@ -52,6 +54,12 @@ paths:
     $ref: './paths/addon/addon-reorder.yaml'
   /admin/addons/{id}:
     $ref: './paths/addon/addon-by-id.yaml'
+  /admin/plans:
+    $ref: './paths/plan/admin-plans.yaml'
+  /admin/plans/reorder:
+    $ref: './paths/plan/plan-reorder.yaml'
+  /admin/plans/{id}:
+    $ref: './paths/plan/plan-by-id.yaml'
 
 components:
   securitySchemes:
@@ -107,6 +115,22 @@ components:
       $ref: './components/models/update-addon-request.schema.yaml'
     ReorderAddonsRequest:
       $ref: './components/models/reorder-addons-request.schema.yaml'
+    Plan:
+      $ref: './components/models/plan.schema.yaml'
+    PlanPriceTier:
+      $ref: './components/models/plan-price-tier.schema.yaml'
+    PlanCoverage:
+      $ref: './components/models/plan-coverage.schema.yaml'
+    PlanListResponse:
+      $ref: './components/models/plan-list-response.schema.yaml'
+    PlanResponse:
+      $ref: './components/models/plan-response.schema.yaml'
+    CreatePlanRequest:
+      $ref: './components/models/create-plan-request.schema.yaml'
+    UpdatePlanRequest:
+      $ref: './components/models/update-plan-request.schema.yaml'
+    ReorderPlansRequest:
+      $ref: './components/models/reorder-plans-request.schema.yaml'
   responses:
     SuccessResponse:
       $ref: './components/responses/success.response.yaml'

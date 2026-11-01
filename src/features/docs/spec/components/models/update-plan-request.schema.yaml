@@ -1,0 +1,32 @@
+type: object
+description: >-
+  Send at least one field. Each list sent replaces that list entirely, in one
+  transaction; a list not sent is left untouched. code, type and sortOrder
+  are not editable here — they are stripped, so a body with only those is an
+  empty update (422). Same rules per field as on create.
+minProperties: 1
+properties:
+  isActive:
+    type: boolean
+    example: true
+  tiers:
+    type: array
+    minItems: 1
+    description: Affects new quotes only; orders keep their own snapshot.
+    items:
+      $ref: './plan-price-tier.schema.yaml'
+  coverages:
+    type: array
+    minItems: 1
+    items:
+      $ref: './plan-coverage.schema.yaml'
+  countryIds:
+    type: array
+    minItems: 1
+    items:
+      type: string
+  addonIds:
+    type: array
+    description: An empty list removes every add-on from the plan.
+    items:
+      type: string

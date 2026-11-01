@@ -1,0 +1,29 @@
+type: object
+description: >-
+  Sum insured for one coverage category. The category label is FE i18n text
+  keyed by categoryKey; only the amount is stored here.
+required:
+  - categoryKey
+  - amount
+properties:
+  categoryKey:
+    type: string
+    enum:
+      - MEDICAL_EXPENSES
+      - ACCIDENTAL_DEATH_DISABILITY
+      - EMERGENCY_EVACUATION
+      - REPATRIATION
+      - TRIP_CANCELLATION
+      - TRIP_CURTAILMENT
+      - FLIGHT_DELAY
+      - BAGGAGE_DELAY
+      - BAGGAGE_LOSS
+      - PERSONAL_LIABILITY
+    description: Enum order is the display order — responses list coverages in it.
+    example: MEDICAL_EXPENSES
+  amount:
+    type: integer
+    minimum: 1
+    maximum: 2000000000
+    description: Sum insured in **satang**, at most ฿20,000,000. 100000000 = ฿1,000,000.
+    example: 100000000

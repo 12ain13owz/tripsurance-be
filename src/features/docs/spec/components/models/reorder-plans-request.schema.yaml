@@ -1,0 +1,30 @@
+type: object
+description: >-
+  The full plan list in its new order. Must include every existing plan
+  exactly once, with unique ids and unique sortOrder values. The admin UI
+  sends the list index as sortOrder (0, 1, 2…).
+required:
+  - items
+properties:
+  items:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required:
+        - id
+        - sortOrder
+      properties:
+        id:
+          type: string
+          example: cmvx2k1ab0000q0fg8h3d7e2c
+        sortOrder:
+          type: integer
+          minimum: 0
+          example: 0
+example:
+  items:
+    - id: cmvx2k1ab0000q0fg8h3d7e2c
+      sortOrder: 0
+    - id: cmvx2k1ac0001q0fg4m5n6p7q
+      sortOrder: 1

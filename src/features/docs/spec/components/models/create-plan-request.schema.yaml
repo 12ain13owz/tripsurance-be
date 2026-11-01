@@ -1,0 +1,45 @@
+type: object
+description: >-
+  isActive, type and sortOrder are not accepted — the plan is created
+  inactive, as SINGLE_TRIP, and placed last. Unknown fields are stripped.
+required:
+  - code
+  - tiers
+  - coverages
+  - countryIds
+properties:
+  code:
+    type: string
+    maxLength: 50
+    pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+    description: Lowercase kebab-case slug; must be unique (409 if taken).
+    example: east-asia-lite
+  tiers:
+    type: array
+    minItems: 1
+    description: >-
+      Any order; must start at day 1 and be contiguous (each minDays =
+      previous maxDays + 1), up to 365 days.
+    items:
+      $ref: './plan-price-tier.schema.yaml'
+  coverages:
+    type: array
+    minItems: 1
+    description: Each categoryKey at most once.
+    items:
+      $ref: './plan-coverage.schema.yaml'
+  countryIds:
+    type: array
+    minItems: 1
+    description: Country row ids (not isoCodes). Duplicates are ignored; unknown ids are 400.
+    items:
+      type: string
+    example: [cmvv5x0aa0001g4fg3kq1a2b3, cmvv5x0ab0002g4fg9zz8y7x6]
+  addonIds:
+    type: array
+    description: >-
+      Add-on row ids (not codes). Optional, defaults to none. Duplicates are
+      ignored; unknown ids are 400.
+    items:
+      type: string
+    example: [cmvv64vho0003g4fgl9cwdj1x]

@@ -1,0 +1,55 @@
+patch:
+  tags:
+    - Plan
+  summary: Reorder plans
+  operationId: reorderPlans
+  description: >-
+    Admin only. Backs drag and drop in the admin list. Writes every sortOrder
+    in one transaction — on any error nothing changes. Returns the full list
+    in its new order.
+  security:
+    - bearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/reorder-plans-request.schema.yaml'
+  responses:
+    '200':
+      description: Reordered plan successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/plan-list-response.schema.yaml'
+    '400':
+      description: >-
+        The list doesn't match the plans in the database — one is missing, or
+        an id is unknown or extra.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Reorder must list every plan exactly once
+            timestamp: '2025-05-29T10:00:00Z'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: >-
+        items is empty, an id or sortOrder appears twice, or a sortOrder is
+        not an integer ≥ 0.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Reorder must list every plan exactly once
+            timestamp: '2025-05-29T10:00:00Z'

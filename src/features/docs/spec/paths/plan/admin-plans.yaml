@@ -1,0 +1,90 @@
+get:
+  tags:
+    - Plan
+  summary: List all plans
+  operationId: listPlans
+  description: >-
+    Admin only. Returns every plan regardless of isActive, ordered by
+    sortOrder then code, with every linked country and add-on (active or
+    not).
+  security:
+    - bearerAuth: []
+  responses:
+    '200':
+      description: Listed plan successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/plan-list-response.schema.yaml'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+post:
+  tags:
+    - Plan
+  summary: Create plan
+  operationId: createPlan
+  description: >-
+    Admin only. The new plan starts inactive and is placed last (current max
+    sortOrder + 1, or 0 for the first). Money fields are satang.
+  security:
+    - bearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../../components/models/create-plan-request.schema.yaml'
+  responses:
+    '201':
+      description: Created plan successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/plan-response.schema.yaml'
+    '400':
+      description: A country or add-on id doesn't exist.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: One or more countries do not exist
+            timestamp: '2025-05-29T10:00:00Z'
+    '401':
+      description: No Authorization header, or the bearer token is invalid/expired.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Authentication required
+            timestamp: '2025-05-29T10:00:00Z'
+    '409':
+      description: Another plan already uses this code.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Plan code already exists
+            timestamp: '2025-05-29T10:00:00Z'
+    '422':
+      description: >-
+        Body failed validation — e.g. code not kebab-case, tiers not starting
+        at day 1 or not contiguous, a duplicate or unknown coverage category,
+        a money field that isn't a positive integer (baht sent instead of
+        satang), or no countries.
+      content:
+        application/json:
+          schema:
+            $ref: '../../components/models/error.schema.yaml'
+          example:
+            message: Price tiers must follow each other with no gaps or overlaps
+            timestamp: '2025-05-29T10:00:00Z'

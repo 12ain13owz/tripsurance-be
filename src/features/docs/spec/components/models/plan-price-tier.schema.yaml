@@ -1,0 +1,28 @@
+type: object
+description: >-
+  Price per traveller for trips of minDays–maxDays days (inclusive). A plan's
+  tiers start at day 1 and follow each other with no gaps or overlaps; the
+  last tier's maxDays is the plan's max trip length (≤ 365).
+required:
+  - minDays
+  - maxDays
+  - pricePerTraveller
+properties:
+  minDays:
+    type: integer
+    minimum: 1
+    maximum: 365
+    example: 1
+  maxDays:
+    type: integer
+    minimum: 1
+    maximum: 365
+    example: 7
+  pricePerTraveller:
+    type: integer
+    minimum: 1
+    maximum: 100000000
+    description: >-
+      Gross price per traveller in **satang**, stamp duty and VAT included.
+      29000 = ฿290.00.
+    example: 29000
