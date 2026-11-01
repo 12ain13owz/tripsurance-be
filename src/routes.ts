@@ -5,6 +5,7 @@ import { authRouter } from '@/features/auth'
 import { countryAdminRouter, countryPublicRouter } from '@/features/country'
 import { docsRouter } from '@/features/docs'
 import { healthRouter } from '@/features/health'
+import { planAdminRouter } from '@/features/plan'
 
 export const publicRoutes = Router()
 export const adminRoutes = Router()
@@ -17,3 +18,4 @@ publicRoutes.use('/countries', countryPublicRouter)
 adminRoutes.use(authenticate)
 adminRoutes.use('/countries', countryAdminRouter)
 adminRoutes.use('/addons', addonAdminRouter)
+adminRoutes.use('/plans', planAdminRouter)

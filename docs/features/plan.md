@@ -112,7 +112,7 @@ breakpoints for every plan by convention only.
 ### Coverages
 
 9. At least 1 coverage; each `categoryKey` is in the allowed list and appears once per plan.
-10. `amount` is a positive integer (satang).
+10. `amount` is a positive integer (satang), at most 20,000,000 THB.
 
 ### Countries
 
