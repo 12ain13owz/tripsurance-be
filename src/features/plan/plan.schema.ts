@@ -8,6 +8,8 @@ import {
   PLAN_ERRORS,
 } from './plan.const'
 
+const ISO_CODE_REGEX = /^[A-Z]{2}$/
+
 const dayField = (label: string) =>
   z
     .number({ error: ERRORS.UTIL.requiredField(label) })
@@ -95,14 +97,21 @@ const idParamsSchema = z.object({
   id: z.string({ error: ERRORS.UTIL.requiredField('Plan id') }),
 })
 
+// Rule 16: optional country filter, ISO 3166-1 alpha-2 uppercase
+const listActiveQuerySchema = z.object({
+  country: z.string().regex(ISO_CODE_REGEX, ERRORS.UTIL.invalidField('country')).optional(),
+})
+
 export const planSchema = {
   get: { params: idParamsSchema },
   create: { body: createSchema },
   update: { body: updateSchema, params: idParamsSchema },
   reorder: { body: reorderSchema },
+  listActive: { query: listActiveQuerySchema },
 } as const
 
 export type CreatePlanInput = z.infer<typeof createSchema>
 export type UpdatePlanInput = z.infer<typeof updateSchema>
 export type ReorderPlanInput = z.infer<typeof reorderSchema>
 export type PlanIdParams = z.infer<typeof idParamsSchema>
+export type ListActivePlanQuery = z.infer<typeof listActiveQuerySchema>

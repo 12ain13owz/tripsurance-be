@@ -3,16 +3,34 @@ import { createResponse } from '@/shared/utils'
 import * as planService from './plan.service'
 import type {
   CreatePlanInput,
+  ListActivePlanQuery,
   PlanIdParams,
   ReorderPlanInput,
   UpdatePlanInput,
 } from './plan.schema'
-import type { PlanAdminData } from './plan.type'
+import type { PlanAdminData, PlanData } from './plan.type'
 import type { NextFunction, Request, Response } from 'express'
 
 export const list = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const data: PlanAdminData[] = await planService.list()
+    const response = createResponse(SUCCESS.UTIL.list('plan'), data)
+
+    res.status(HttpStatus.OK).json(response)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const listActive = async (
+  req: Request<unknown, unknown, unknown, ListActivePlanQuery>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { country } = req.query
+
+    const data: PlanData[] = await planService.listActive(country)
     const response = createResponse(SUCCESS.UTIL.list('plan'), data)
 
     res.status(HttpStatus.OK).json(response)

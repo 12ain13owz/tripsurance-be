@@ -4,7 +4,7 @@ import type { Prisma } from '@/generated/prisma/client'
 import { ERRORS, ErrorSeverity, HttpStatus } from '@/shared/constants'
 import { PLAN_COVERAGE_CATEGORIES, PLAN_ERRORS } from './plan.const'
 import type { CreatePlanInput, ReorderPlanInput, UpdatePlanInput } from './plan.schema'
-import type { PlanAdminData } from './plan.type'
+import type { PlanAdminData, PlanData } from './plan.type'
 
 const LIST_ORDER = [{ sortOrder: 'asc' }, { code: 'asc' }] as const
 
@@ -28,6 +28,13 @@ const PLAN_INCLUDE = {
 
 type PlanWithRelations = Prisma.PlanGetPayload<{ include: typeof PLAN_INCLUDE }>
 
+// Rules 12, 14: public responses list only active countries and add-ons
+const PUBLIC_INCLUDE = {
+  ...PLAN_INCLUDE,
+  countries: { ...PLAN_INCLUDE.countries, where: { country: { isActive: true } } },
+  addons: { ...PLAN_INCLUDE.addons, where: { addon: { isActive: true } } },
+} satisfies Prisma.PlanInclude
+
 // ------------------------------------------------------------------------------
 // Helpers (not exported)
 // ------------------------------------------------------------------------------
@@ -35,20 +42,32 @@ type PlanWithRelations = Prisma.PlanGetPayload<{ include: typeof PLAN_INCLUDE }>
 const coverageRank = (categoryKey: string): number =>
   PLAN_COVERAGE_CATEGORIES.findIndex((key) => key === categoryKey)
 
-const toAdminData = ({
+const toPlanData = ({
+  id,
+  code,
+  type,
   tiers,
   coverages,
   countries,
   addons,
-  ...plan
-}: PlanWithRelations): PlanAdminData => ({
-  ...plan,
+}: PlanWithRelations): PlanData => ({
+  id,
+  code,
+  type,
   tiers,
   coverages: [...coverages].sort(
     (a, b) => coverageRank(a.categoryKey) - coverageRank(b.categoryKey)
   ),
   countries: countries.map(({ country }) => country.isoCode),
   addons: addons.map(({ addon }) => addon),
+})
+
+const toAdminData = (plan: PlanWithRelations): PlanAdminData => ({
+  ...toPlanData(plan),
+  isActive: plan.isActive,
+  sortOrder: plan.sortOrder,
+  createdAt: plan.createdAt,
+  updatedAt: plan.updatedAt,
 })
 
 const findById = async (id: string, operation: string): Promise<PlanWithRelations> => {
@@ -101,6 +120,21 @@ export const list = async (): Promise<PlanAdminData[]> => {
   const plans = await wrapUnexpected(query, 'listPlan')
 
   return plans.map(toAdminData)
+}
+
+export const listActive = async (country?: string): Promise<PlanData[]> => {
+  const query = prisma.plan.findMany({
+    where: {
+      isActive: true,
+      // Rule 16: an unknown or inactive country matches no plan, so the list is empty (not 404)
+      countries: country ? { some: { country: { isoCode: country, isActive: true } } } : undefined,
+    },
+    orderBy: [...LIST_ORDER],
+    include: PUBLIC_INCLUDE,
+  })
+  const plans = await wrapUnexpected(query, 'listActivePlan', { country })
+
+  return plans.map(toPlanData)
 }
 
 export const get = async (id: string): Promise<PlanAdminData> => {
