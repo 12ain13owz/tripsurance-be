@@ -16,6 +16,10 @@ properties:
     type: string
     enum: [SINGLE_TRIP]
     example: SINGLE_TRIP
+  isFeatured:
+    type: boolean
+    description: Show the plan as recommended (badge + emphasis).
+    example: true
   tiers:
     type: array
     description: Ordered by minDays. The last tier's maxDays is the max trip length.

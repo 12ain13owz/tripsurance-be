@@ -45,8 +45,8 @@ patch:
   summary: Update plan
   operationId: updatePlan
   description: >-
-    Admin only. Updates any of isActive, tiers, coverages, countryIds,
-    addonIds; each list sent replaces the old one. code and type never change
+    Admin only. Updates any of isActive, isFeatured, tiers, coverages,
+    countryIds, addonIds; each list sent replaces the old one. code and type never change
     and order is changed only through PATCH /admin/plans/reorder. Plans are
     never deleted — set isActive to false. A price change affects new quotes
     only; orders keep their own snapshot.

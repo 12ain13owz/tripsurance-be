@@ -1,7 +1,8 @@
 type: object
 description: >-
-  isActive, type and sortOrder are not accepted — the plan is created
-  inactive, as SINGLE_TRIP, and placed last. Unknown fields are stripped.
+  isActive, isFeatured, type and sortOrder are not accepted — the plan is
+  created inactive, not featured, as SINGLE_TRIP, and placed last. Unknown
+  fields are stripped.
 required:
   - code
   - tiers

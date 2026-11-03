@@ -22,6 +22,12 @@ properties:
     type: boolean
     description: Whether consumers can see it. New plans start inactive.
     example: true
+  isFeatured:
+    type: boolean
+    description: >-
+      Whether the storefront highlights it as recommended. New plans start
+      false; any number of plans may be featured. Does not affect order.
+    example: false
   sortOrder:
     type: integer
     readOnly: true

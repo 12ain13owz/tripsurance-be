@@ -9,6 +9,9 @@ properties:
   isActive:
     type: boolean
     example: true
+  isFeatured:
+    type: boolean
+    example: true
   tiers:
     type: array
     minItems: 1

@@ -32,7 +32,7 @@ interface CountArgs {
 }
 interface PlanUpdateArgs {
   where: { id: string }
-  data: { isActive?: boolean; sortOrder?: number }
+  data: { isActive?: boolean; isFeatured?: boolean; sortOrder?: number }
 }
 interface DeleteManyArgs {
   where: { planId: string }
@@ -93,6 +93,7 @@ const planRow: PlanRow = {
   code: 'asia-basic',
   type: 'SINGLE_TRIP',
   isActive: false,
+  isFeatured: false,
   sortOrder: 0,
   ...timestamps,
   tiers,
@@ -109,6 +110,7 @@ const planData: PlanAdminData = {
   code: 'asia-basic',
   type: 'SINGLE_TRIP',
   isActive: false,
+  isFeatured: false,
   sortOrder: 0,
   ...timestamps,
   tiers,
@@ -124,6 +126,7 @@ const publicData: PlanData = {
   id: planData.id,
   code: planData.code,
   type: planData.type,
+  isFeatured: planData.isFeatured,
   tiers: planData.tiers,
   coverages: planData.coverages,
   countries: planData.countries,
@@ -196,6 +199,14 @@ describe('listActive', () => {
     expect(result[0]).not.toHaveProperty('isActive')
     expect(result[0]).not.toHaveProperty('sortOrder')
     expect(result[0]).not.toHaveProperty('createdAt')
+  })
+
+  it('keeps isFeatured so the storefront can badge recommended plans', async () => {
+    findManyMock.mockResolvedValue([{ ...planRow, isFeatured: true }])
+
+    const result = await listActive()
+
+    expect(result[0].isFeatured).toBe(true)
   })
 
   it('queries active plans in sortOrder, then code, with no country filter by default', async () => {
@@ -295,12 +306,13 @@ describe('create', () => {
     expect(createMock.mock.calls[0][0].data.sortOrder).toBe(5)
   })
 
-  it('never sets isActive, so the plan starts inactive (schema default)', async () => {
+  it('never sets isActive or isFeatured, so the plan starts inactive and not featured', async () => {
     arrangeValidCreate(null)
 
     await create(createInput)
 
     expect(createMock.mock.calls[0][0].data).not.toHaveProperty('isActive')
+    expect(createMock.mock.calls[0][0].data).not.toHaveProperty('isFeatured')
   })
 
   it('throws a 409 AppError and never creates when the code is already taken', async () => {
@@ -413,6 +425,19 @@ describe('update', () => {
       data: { isActive: true },
     })
     expect(result).toEqual({ ...planData, isActive: true })
+  })
+
+  it('writes isFeatured to the plan row and returns the re-read plan', async () => {
+    const featuredRow = { ...planRow, isFeatured: true }
+    findUniqueMock.mockResolvedValueOnce(planRow).mockResolvedValueOnce(featuredRow)
+
+    const result = await update('plan-1', { isFeatured: true })
+
+    expect(tx.plan.update).toHaveBeenCalledWith({
+      where: { id: 'plan-1' },
+      data: { isFeatured: true },
+    })
+    expect(result).toEqual({ ...planData, isFeatured: true })
   })
 
   it('throws a 404 AppError and never writes when the plan does not exist', async () => {

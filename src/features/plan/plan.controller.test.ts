@@ -40,6 +40,7 @@ const plan: PlanAdminData = {
   code: 'asia-basic',
   type: 'SINGLE_TRIP',
   isActive: false,
+  isFeatured: false,
   sortOrder: 0,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
@@ -111,6 +112,7 @@ describe('GET /plans', () => {
     id: plan.id,
     code: plan.code,
     type: plan.type,
+    isFeatured: plan.isFeatured,
     tiers: plan.tiers,
     coverages: plan.coverages,
     countries: plan.countries,
@@ -280,13 +282,13 @@ describe('POST /admin/plans', () => {
     expect(createMock).toHaveBeenCalledWith({ ...validCreateBody, addonIds: [] })
   })
 
-  it('strips client-sent sortOrder and isActive — the server decides both', async () => {
+  it('strips client-sent sortOrder, isActive and isFeatured — server-decided', async () => {
     createMock.mockResolvedValue(plan)
 
     await request(app)
       .post('/admin/plans')
       .set(...authHeader)
-      .send({ ...validCreateBody, sortOrder: 0, isActive: true })
+      .send({ ...validCreateBody, sortOrder: 0, isActive: true, isFeatured: true })
 
     expect(createMock).toHaveBeenCalledWith(validCreateBody)
   })
@@ -384,6 +386,28 @@ describe('PATCH /admin/plans/:id', () => {
     expect(res.status).toBe(HttpStatus.OK)
     expect(body.message).toBe(SUCCESS.UTIL.update('plan'))
     expect(updateMock).toHaveBeenCalledWith('plan-1', { isActive: true, addonIds: [] })
+  })
+
+  it('accepts isFeatured on its own', async () => {
+    updateMock.mockResolvedValue({ ...plan, isFeatured: true })
+
+    const res = await request(app)
+      .patch('/admin/plans/plan-1')
+      .set(...authHeader)
+      .send({ isFeatured: true })
+
+    expect(res.status).toBe(HttpStatus.OK)
+    expect(updateMock).toHaveBeenCalledWith('plan-1', { isFeatured: true })
+  })
+
+  it('returns 422 and never calls the service when isFeatured is not a boolean', async () => {
+    const res = await request(app)
+      .patch('/admin/plans/plan-1')
+      .set(...authHeader)
+      .send({ isFeatured: 'yes' })
+
+    expect(res.status).toBe(HttpStatus.UNPROCESSABLE_ENTITY)
+    expect(updateMock).not.toHaveBeenCalled()
   })
 
   it('returns 422 and never calls the service when the body is empty', async () => {
