@@ -83,6 +83,7 @@ const createSchema = z.object({
 const updateSchema = z
   .object({
     isActive: z.boolean({ error: ERRORS.UTIL.requiredField('isActive') }),
+    isFeatured: z.boolean({ error: ERRORS.UTIL.requiredField('isFeatured') }),
     tiers: tiersField,
     coverages: coveragesField,
     countryIds: countryIdsField,

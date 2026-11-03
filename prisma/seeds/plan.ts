@@ -3,6 +3,7 @@ import type { PrismaClient } from '../../src/generated/prisma/client'
 interface SeedPlan {
   code: string
   sortOrder: number
+  isFeatured: boolean
   tiers: { minDays: number; maxDays: number; pricePerTraveller: number }[] // satang
   coverages: { categoryKey: string; amount: number }[] // satang
   countryIsoCodes: string[] | null // null = every country except HOME_ISO_CODE
@@ -41,6 +42,7 @@ const SEED_PLANS: SeedPlan[] = [
   {
     code: 'asia-basic',
     sortOrder: 10,
+    isFeatured: false,
     tiers: [
       { minDays: 1, maxDays: 7, pricePerTraveller: 29_000 },
       { minDays: 8, maxDays: 15, pricePerTraveller: 45_000 },
@@ -64,6 +66,7 @@ const SEED_PLANS: SeedPlan[] = [
   {
     code: 'worldwide-plus',
     sortOrder: 20,
+    isFeatured: true,
     tiers: [
       { minDays: 1, maxDays: 7, pricePerTraveller: 59_000 },
       { minDays: 8, maxDays: 15, pricePerTraveller: 99_000 },
@@ -109,6 +112,7 @@ export async function seedPlans(prisma: PrismaClient): Promise<void> {
         code: plan.code,
         sortOrder: plan.sortOrder,
         isActive: true,
+        isFeatured: plan.isFeatured,
         tiers: { createMany: { data: plan.tiers } },
         coverages: { createMany: { data: plan.coverages } },
         countries: { createMany: { data: countryIds } },

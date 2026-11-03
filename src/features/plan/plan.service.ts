@@ -47,6 +47,7 @@ const toPlanData = ({
   code,
   type,
   tiers,
+  isFeatured,
   coverages,
   countries,
   addons,
@@ -54,6 +55,7 @@ const toPlanData = ({
   id,
   code,
   type,
+  isFeatured,
   tiers,
   coverages: [...coverages].sort(
     (a, b) => coverageRank(a.categoryKey) - coverageRank(b.categoryKey)
@@ -184,7 +186,7 @@ export const update = async (id: string, input: UpdatePlanInput): Promise<PlanAd
   await findById(id, 'updatePlan')
   await assertLinksExist(input, 'updatePlan')
 
-  const { isActive, tiers, coverages, countryIds, addonIds } = input
+  const { isActive, isFeatured, tiers, coverages, countryIds, addonIds } = input
 
   // Rule 19: each list sent replaces that list; a list not sent is left untouched
   const updatePlanQuery = prisma.$transaction(async (tx) => {
@@ -209,7 +211,7 @@ export const update = async (id: string, input: UpdatePlanInput): Promise<PlanAd
       await tx.planAddon.createMany({ data: addonIds.map((addonId) => ({ planId: id, addonId })) })
     }
     // Always touch the plan row so updatedAt moves even when only child lists changed
-    await tx.plan.update({ where: { id }, data: { isActive } })
+    await tx.plan.update({ where: { id }, data: { isActive, isFeatured } })
   })
   await wrapUnexpected(updatePlanQuery, 'updatePlan', { id })
 

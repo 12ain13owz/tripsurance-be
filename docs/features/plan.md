@@ -36,6 +36,7 @@ Plan
   code       String  @unique            // stable slug, e.g. "asia-basic"
   type       PlanType @default(SINGLE_TRIP)
   isActive   Boolean @default(false)    // new plans start hidden until reviewed
+  isFeatured Boolean @default(false)    // storefront "recommended" badge
   sortOrder  Int     @default(0)        // storefront order; set by the server, changed via reorder
   createdAt, updatedAt
 
@@ -139,10 +140,18 @@ breakpoints for every plan by convention only.
 
 ### Updates
 
-19. `PATCH /admin/plans/:id` accepts any of `isActive`, `tiers`, `coverages`, `countryIds`,
-    `addonIds`. Each list sent **replaces** that list entirely (in one transaction); a list not sent
-    is left untouched.
+19. `PATCH /admin/plans/:id` accepts any of `isActive`, `isFeatured`, `tiers`, `coverages`,
+    `countryIds`, `addonIds`. Each list sent **replaces** that list entirely (in one transaction); a
+    list not sent is left untouched.
 20. Changing a price affects new quotes only — orders keep their own snapshot.
+
+### Featured
+
+21. `isFeatured` marks a plan the storefront highlights as **recommended** (badge + emphasis).
+    It starts `false` on create and changes only through `PATCH /admin/plans/:id`. Any number of
+    plans may be featured — e.g. one per zone. It has no effect on order (`sortOrder` still decides).
+22. It is a merchandising choice by admins, not a sales statistic: the FE labels it "Recommended",
+    never "Most popular", until real order data exists.
 
 ## Endpoints
 
@@ -155,8 +164,8 @@ breakpoints for every plan by convention only.
 | PATCH  | `/admin/plans/:id`     | admin  | Update (rule 19); `code`, `type` and `sortOrder` not editable                                      |
 | GET    | `/plans`               | public | Active plans; optional `?country=JP` (rule 16)                                                     |
 
-Response shape (both audiences): `id`, `code`, `type`, `tiers[]`, `coverages[]`, countries as
-`isoCode`s, and `addons[]` (`code`, `pricingType`, `price`, `coverageAmount`). Admin also gets
+Response shape (both audiences): `id`, `code`, `type`, `isFeatured`, `tiers[]`, `coverages[]`,
+countries as `isoCode`s, and `addons[]` (`code`, `pricingType`, `price`, `coverageAmount`). Admin also gets
 `isActive`, `sortOrder`, timestamps and every linked country/add-on; public gets active ones only.
 Exact shapes go into OpenAPI after manual testing.
 
@@ -177,4 +186,5 @@ Exact shapes go into OpenAPI after manual testing.
 
 - `asia-basic` — Asian countries (a hardcoded `isoCode` list in the seed, since `Country` has no
   region); tiers 1–7 / 8–15 / 16–31 / 32–90 / 91–180 days; a couple of add-ons.
-- `worldwide-plus` — all countries; same tier breakpoints, higher prices and coverage; all add-ons.
+- `worldwide-plus` — all countries; same tier breakpoints, higher prices and coverage; all add-ons;
+  featured.
