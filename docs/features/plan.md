@@ -1,13 +1,19 @@
 # Plan
 
-> Status: **Built.** This slice covers single-trip plans only; annual plans are the next slice
-> (see `ROADMAP.md`). Built **after** [Add-on](addon.md). Code lives in `src/features/plan/`.
+> Status: **Single trip built; annual agreed, not built yet** (see `ROADMAP.md` #5). Built
+> **after** [Add-on](addon.md). Code lives in `src/features/plan/`.
 
 ## Purpose
 
 A plan is an insurance package a consumer can buy: what it covers (coverage amounts), where it covers
-(countries), what it costs (price tiers by trip length), and which add-ons can be bought with it.
-Admins create and maintain plans; consumers browse active plans and pick one.
+(countries), what it costs, and which add-ons can be bought with it. Admins create and maintain
+plans; consumers browse active plans and pick one.
+
+A plan has one of two **types**, set on create and never changed:
+
+- **`SINGLE_TRIP`** — covers one trip. Price per traveller comes from **price tiers** by trip length.
+- **`ANNUAL`** — covers any number of trips for one year. One **price per traveller per year**,
+  and each trip may last at most **`maxDaysPerTrip`** days. No add-ons (for now).
 
 A plan is **date-independent** — travel dates, travellers and the final price belong to the Order.
 
@@ -17,7 +23,10 @@ A plan is **date-independent** — travel dates, travellers and the final price 
   (`tripsurance-fe/src/shared/i18n/messages/{en,th}/plans.json`), keyed by `plan.code`.
 - **Quote / total price calculation** (`calculateQuote`). Lands with Order; this slice only stores
   the data it will read.
-- **Annual plans** — next slice. Adds `ANNUAL` to `PlanType` and its pricing.
+- **Add-ons on annual plans.** Not offered in this slice; may be added later.
+- **Annual price by age or other factors.** One flat price per traveller per year for now.
+- **Coverage period of an annual policy** (start date chosen by the buyer, lasts one year). That's
+  Order data, not Plan.
 - **Managing add-ons themselves** (price, pricing type, activation) — that's the
   [Add-on](addon.md) feature. Plan only says _which_ add-ons it offers.
 - **Deleting plans.** Plans are deactivated (`isActive = false`), never deleted, so past orders and
@@ -29,7 +38,7 @@ A plan is **date-independent** — travel dates, travellers and the final price 
 New file `prisma/schema/plan.prisma`. All money is **integer satang** (THB × 100).
 
 ```
-enum PlanType { SINGLE_TRIP }            // ANNUAL added by the annual slice
+enum PlanType { SINGLE_TRIP, ANNUAL }
 
 Plan
   id         cuid
@@ -38,9 +47,11 @@ Plan
   isActive   Boolean @default(false)    // new plans start hidden until reviewed
   isFeatured Boolean @default(false)    // storefront "recommended" badge
   sortOrder  Int     @default(0)        // storefront order; set by the server, changed via reorder
+  annualPricePerTraveller Int?          // ANNUAL only: satang per traveller per year, gross
+  maxDaysPerTrip          Int?          // ANNUAL only: longest single trip covered
   createdAt, updatedAt
 
-PlanPriceTier                           // price per traveller by trip length
+PlanPriceTier                           // SINGLE_TRIP only: price per traveller by trip length
   id, planId → Plan (cascade)
   minDays    Int
   maxDays    Int
@@ -94,12 +105,28 @@ validation and fail with **422**. Rules that need the database fail in the servi
 1. `code` is lowercase kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`), max 50 chars, unique.
 2. `code` is **set on create and never changes** — update requests can't change it.
 
-### Price tiers
+### Type
+
+A1. `type` is required on create (`SINGLE_TRIP` or `ANNUAL`) and never changes.
+A2. The pricing fields depend on the type; sending the other type's fields is a 422:
+
+| Type          | Must send                                   | Must not send                                   |
+| ------------- | ------------------------------------------- | ----------------------------------------------- |
+| `SINGLE_TRIP` | `tiers` (rules 3–8)                         | `annualPricePerTraveller`, `maxDaysPerTrip`     |
+| `ANNUAL`      | `annualPricePerTraveller`, `maxDaysPerTrip` | `tiers`, a non-empty `addonIds`                 |
+
+A3. `annualPricePerTraveller` is a positive integer (satang), the **gross** price per traveller for
+    one year — same rule as rule 8.
+A4. `maxDaysPerTrip` is an integer 1–365, set per plan by the admin. It is a policy term (printed on
+    the policy), not checked at purchase: an annual order doesn't list its trips.
+A5. Countries and coverages follow the same rules for both types.
+
+### Price tiers (`SINGLE_TRIP`)
 
 Breakpoints are **free per plan** — plans don't have to share them. The seed uses the same
 breakpoints for every plan by convention only.
 
-3. A plan has at least 1 tier.
+3. A single-trip plan has at least 1 tier; an annual plan has none.
 4. The first tier starts at `minDays = 1`.
 5. Tiers are contiguous: sorted by `minDays`, each tier's `minDays` = previous `maxDays + 1` — no
    gaps, no overlaps.
@@ -122,7 +149,8 @@ breakpoints for every plan by convention only.
 
 ### Add-ons
 
-13. Zero or more add-ons; ids must exist (400 otherwise). Duplicates are ignored.
+13. Zero or more add-ons; ids must exist (400 otherwise). Duplicates are ignored. Annual plans
+    have no add-ons (rule A2).
 14. A plan may keep an add-on that has since been deactivated, but the **public** response only
     lists active add-ons — same rule as countries.
 
@@ -141,8 +169,10 @@ breakpoints for every plan by convention only.
 ### Updates
 
 19. `PATCH /admin/plans/:id` accepts any of `isActive`, `isFeatured`, `tiers`, `coverages`,
-    `countryIds`, `addonIds`. Each list sent **replaces** that list entirely (in one transaction); a
-    list not sent is left untouched.
+    `countryIds`, `addonIds`, `annualPricePerTraveller`, `maxDaysPerTrip`. Each list sent
+    **replaces** that list entirely (in one transaction); a field not sent is left untouched.
+    Fields that don't match the plan's stored `type` are a 400 (rule A2; the type comes from the DB,
+    so this check is in the service).
 20. Changing a price affects new quotes only — orders keep their own snapshot.
 
 ### Featured
@@ -159,12 +189,13 @@ breakpoints for every plan by convention only.
 | ------ | ---------------------- | ------ | -------------------------------------------------------------------------------------------------- |
 | GET    | `/admin/plans`         | admin  | All plans (active and inactive), with tiers, coverages, countries, add-ons                         |
 | GET    | `/admin/plans/:id`     | admin  | One plan (404 if not found)                                                                        |
-| POST   | `/admin/plans`         | admin  | Create (`code`, `tiers`, `coverages`, `countryIds`, `addonIds?`); placed last; 409 if `code` taken |
+| POST   | `/admin/plans`         | admin  | Create (`code`, `type`, pricing per rule A2, `coverages`, `countryIds`, `addonIds?`); placed last; 409 if `code` taken |
 | PATCH  | `/admin/plans/reorder` | admin  | Reorder all plans (rule 18); registered before `/:id`                                              |
 | PATCH  | `/admin/plans/:id`     | admin  | Update (rule 19); `code`, `type` and `sortOrder` not editable                                      |
 | GET    | `/plans`               | public | Active plans; optional `?country=JP` (rule 16)                                                     |
 
-Response shape (both audiences): `id`, `code`, `type`, `isFeatured`, `tiers[]`, `coverages[]`,
+Response shape (both audiences): `id`, `code`, `type`, `isFeatured`, `tiers[]` (empty for annual),
+`annualPricePerTraveller` and `maxDaysPerTrip` (`null` for single trip), `coverages[]`,
 countries as `isoCode`s, and `addons[]` (`code`, `pricingType`, `price`, `coverageAmount`). Admin also gets
 `isActive`, `sortOrder`, timestamps and every linked country/add-on; public gets active ones only.
 Exact shapes go into OpenAPI after manual testing.
@@ -173,10 +204,12 @@ Exact shapes go into OpenAPI after manual testing.
 
 - **Country** — `PlanCountry.countryId` → `Country.id`. Public responses filter by `Country.isActive`.
 - **Add-on** — `PlanAddon.addonId` → `Addon.id`. Public responses filter by `Addon.isActive`.
-- **Order** (later) — snapshots the chosen plan's `code`, matched tier price, coverages, countries and
-  chosen add-ons. Never references live Plan data after purchase.
-- **Quote** (later) — reads `PlanPriceTier` to find the tier containing the trip's day count, and
-  checks requested add-ons are offered by the plan and active.
+- **Order** (later) — snapshots the chosen plan's `code`, `type`, price (matched tier or annual
+  price), `maxDaysPerTrip`, coverages, countries and chosen add-ons. Never references live Plan data
+  after purchase. An annual order covers one year from the start date the buyer picks.
+- **Quote** (later) — single trip: reads `PlanPriceTier` to find the tier containing the trip's day
+  count, and checks requested add-ons are offered by the plan and active. Annual:
+  `annualPricePerTraveller` × travellers; no day count, no add-ons.
 - **FE** — admin form edits money in **baht** and converts to satang (× 100) before sending; the API
   only speaks satang.
 
@@ -188,3 +221,4 @@ Exact shapes go into OpenAPI after manual testing.
   region); tiers 1–7 / 8–15 / 16–31 / 32–90 / 91–180 days; a couple of add-ons.
 - `worldwide-plus` — all countries; same tier breakpoints, higher prices and coverage; all add-ons;
   featured.
+- `worldwide-annual` — `ANNUAL`, all countries; one yearly price, `maxDaysPerTrip` 90; no add-ons.
