@@ -5,6 +5,9 @@ export const LOG = {
     missing: (envFile: string) => `[Config] ⚠️ Missing environment file: ${envFile}`,
     loadError: (envFile: string) => `[Config] ❌ Unexpected error loading ${envFile}:`,
   },
+  DATABASE: {
+    connectFailed: '[Database] ❌ Failed to connect to PostgreSQL',
+  },
 }
 
 export const SUCCESS = {
